@@ -1,4 +1,4 @@
-# Codenames — Desktop Application
+# CS4100 Project — Codenames
 
 A complete Python desktop implementation of the board game **Codenames** (classic edition) with a visual PyQt6 interface.
 
