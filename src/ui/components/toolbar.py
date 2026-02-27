@@ -1,0 +1,28 @@
+from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtWidgets import QCheckBox, QHBoxLayout, QPushButton, QWidget
+
+
+class Toolbar(QWidget):
+    start_clicked = pyqtSignal()
+    spymaster_toggled = pyqtSignal(bool)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(16)
+
+        self._start_btn = QPushButton("Start Game")
+        self._start_btn.setObjectName("primary")
+        self._start_btn.setMinimumHeight(40)
+        self._start_btn.clicked.connect(self.start_clicked.emit)
+        layout.addWidget(self._start_btn)
+
+        layout.addStretch()
+
+        self._spymaster_check = QCheckBox("Spymaster view (show card colors)")
+        self._spymaster_check.toggled.connect(self.spymaster_toggled.emit)
+        layout.addWidget(self._spymaster_check)
+
+    def set_start_enabled(self, enabled: bool) -> None:
+        self._start_btn.setEnabled(enabled)
