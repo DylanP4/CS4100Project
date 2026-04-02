@@ -10,10 +10,13 @@ from ui.main_window import MainWindow
 
 
 def main():
+    training_mode = "training" in sys.argv
     app = QApplication(sys.argv)
     app.setApplicationName("Codenames")
-    win = MainWindow()
+    win = MainWindow(training_mode=training_mode)
     win.show()
+    if training_mode:
+        print("[AI] Training mode active — all spymaster clues will be recorded.")
     sys.exit(app.exec())
 
 
