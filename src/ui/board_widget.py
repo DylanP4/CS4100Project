@@ -23,6 +23,7 @@ def _card_style(bg: str, fg: str, border: str) -> str:
 
 
 STYLE_UNREVEALED = _card_style(CARD_FACE, TEXT, CARD_FACE_BORDER)
+STYLE_REVEALED_SPY = _card_style("#d4d4d8", "#a1a1aa", "#e4e4e7")
 KEY_STYLES = {
     RED: _card_style(RED_HEX, "white", "#991b1b"),
     BLUE: _card_style(BLUE_HEX, "white", "#1e40af"),
@@ -74,6 +75,8 @@ class BoardWidget(CardPanel):
             return STYLE_UNREVEALED
         key_type = self._key[index]
         if self._spymaster_view:
+            if self._revealed[index]:
+                return STYLE_REVEALED_SPY
             return KEY_STYLES.get(key_type, STYLE_UNREVEALED)
         if not self._revealed[index]:
             return STYLE_UNREVEALED

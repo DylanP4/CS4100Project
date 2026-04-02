@@ -116,6 +116,38 @@ class SpymasterAgent:
 
         return {"clue": clue_word, "number": number, "covered": covered}
 
+    def record_human_clue(
+        self,
+        team_words: list[str],
+        all_board_words: list[str],
+        clue_word: str,
+        number: int,
+    ) -> bool:
+        """
+        Record a human-submitted clue as a training transition (training mode).
+
+        Builds state and action_vec from the human's clue so that
+        record_outcome() can complete the transition after the operative turn.
+
+        Returns False if clue_word is not in the GloVe vocabulary (can't train
+        on words the model has never seen), True otherwise.
+        """
+        model = load_model()
+        key = clue_word.lower()
+        if key not in model:
+            print(f"[AI] '{clue_word}' not in vocabulary — skipping this turn.")
+            return False
+
+        team_vecs, avoid_vecs = self._split_vecs(team_words, all_board_words, model)
+        state = self._agent.build_state(team_vecs, avoid_vecs)
+        clue_vec = model[key]
+        action_vec = self._agent.build_action_vec(clue_vec, number)
+
+        self._last_state = state
+        self._last_action_vec = action_vec
+        self._last_covered = []
+        return True
+
     def record_outcome(
         self,
         outcomes: list[str],

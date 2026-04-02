@@ -160,6 +160,14 @@ class GameEngine:
         self._end_turn()
         return True, ""
 
+    def reset(self):
+        """Abandon the current game and return to the pre-game state."""
+        self._board = None
+        self._game_over = False
+        self._winner = None
+        self._loser = None
+        self._emit()
+
     def _end_turn(self):
         self._current_team = BLUE if self._current_team == RED else RED
         self._phase = PHASE_SPYMASTER
