@@ -16,7 +16,11 @@ def main():
     win = MainWindow(training_mode=training_mode)
     win.show()
     if training_mode:
-        print("[AI] Training mode active — all spymaster clues will be recorded.")
+        print("[AI] Training mode")
+        print("    • Use AI Suggest or type a clue, then Submit — play guesses as operative.")
+        print("    • Each finished clue turn runs one Q-learning update and saves data/agent.pkl.")
+        print("    • Optional: check team-word boxes before submit to tag intended targets.")
+        print("    • State uses team / opponent / neutral / assassin words (see SpymasterBoardView).")
     sys.exit(app.exec())
 
 
