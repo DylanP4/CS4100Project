@@ -3,12 +3,13 @@ Q-learning agent for the Codenames AI spymaster.
 
 Architecture
 ------------
-State  : 200-dim vector  — mean(team word vecs) + mean(avoid word vecs)
+State  : 400-dim vector — mean(team) + mean(opponent) + mean(neutral) + mean(assassin)
+         (100d each; empty groups use zeros so the net sees role structure.)
 Action : 101-dim vector  — clue word embedding (100d) + normalized number (1d)
-Input  : 301-dim         — state concatenated with action
+Input  : 501-dim         — state concatenated with action
 Output : scalar Q-value  — expected cumulative reward for (state, action)
 
-Network: 301 → 128 → 64 → 1  (ReLU activations, Adam optimizer, pure numpy)
+Network: 501 → 128 → 64 → 1  (ReLU activations, Adam optimizer, pure numpy)
 
 Training loop (called from main_window after each human guess):
   1. agent.build_state(...)         → state vector
@@ -36,9 +37,9 @@ TARGET_UPDATE_FREQ = 100  # sync target network every N gradient steps
 
 # ── Dimensions ─────────────────────────────────────────────────────────────────
 EMBED_DIM = 100         # GloVe 100d
-STATE_DIM = EMBED_DIM * 2   # 200: mean(team) + mean(avoid)
+STATE_DIM = EMBED_DIM * 4   # 400: team, opponent, neutral, assassin pools
 ACTION_DIM = EMBED_DIM + 1  # 101: clue vec + normalized number
-INPUT_DIM = STATE_DIM + ACTION_DIM  # 301
+INPUT_DIM = STATE_DIM + ACTION_DIM  # 501
 
 # ── Rewards ────────────────────────────────────────────────────────────────────
 REWARD_CORRECT = 1.0
@@ -98,7 +99,7 @@ class ReplayBuffer:
 
 class QNetwork:
     """
-    Fully-connected network: INPUT_DIM → 128 → 64 → 1.
+    Fully-connected network: INPUT_DIM (state+action) → 128 → 64 → 1.
     Uses ReLU activations and an Adam optimizer.
     Implemented in pure numpy — no PyTorch/TensorFlow required.
     """
@@ -195,7 +196,7 @@ class QLearningAgent:
     """
     Wraps QNetwork + ReplayBuffer and exposes a simple interface for the UI:
 
-        state      = agent.build_state(team_vecs, avoid_vecs)
+        state      = agent.build_state(team_vecs, opp_vecs, neu_vecs, ass_vecs)
         clue, num, action_vec = agent.select_action(state, candidates)
         # ... human guesses, reward computed ...
         next_best_q = agent.best_q(next_state, next_candidates)
@@ -222,16 +223,23 @@ class QLearningAgent:
     def build_state(
         self,
         team_vecs: list[np.ndarray],
-        avoid_vecs: list[np.ndarray],
+        opponent_vecs: list[np.ndarray],
+        neutral_vecs: list[np.ndarray],
+        assassin_vecs: list[np.ndarray],
     ) -> np.ndarray:
         """
-        Build a 200-dim state vector from the current board.
-        team_vecs  : embeddings for unrevealed team words.
-        avoid_vecs : embeddings for opponent + neutral + assassin words.
+        Build a 400-dim state: mean embedding per role (unrevealed cards only).
         """
-        team_mean = np.mean(team_vecs, axis=0) if team_vecs else np.zeros(EMBED_DIM)
-        avoid_mean = np.mean(avoid_vecs, axis=0) if avoid_vecs else np.zeros(EMBED_DIM)
-        return np.concatenate([team_mean, avoid_mean]).astype(np.float32)
+        def _mean(vecs: list[np.ndarray]) -> np.ndarray:
+            return np.mean(vecs, axis=0) if vecs else np.zeros(EMBED_DIM)
+
+        parts = [
+            _mean(team_vecs),
+            _mean(opponent_vecs),
+            _mean(neutral_vecs),
+            _mean(assassin_vecs),
+        ]
+        return np.concatenate(parts).astype(np.float32)
 
     def build_action_vec(self, clue_vec: np.ndarray, number: int) -> np.ndarray:
         """Build a 101-dim action vector: clue embedding + normalized number."""
@@ -341,8 +349,7 @@ class QLearningAgent:
 
     # ── Persistence ────────────────────────────────────────────────────────────
 
-    def save(self, path: str | Path):
-        """Save network weights and training state to a pickle file."""
+    def save(self, path: str | Path, log_suffix: str = ""):
         data = {
             "params": {k: getattr(self.q_net, k) for k in ("W1", "b1", "W2", "b2", "W3", "b3")},
             "epsilon": self.epsilon,
@@ -350,15 +357,25 @@ class QLearningAgent:
         }
         with open(path, "wb") as f:
             pickle.dump(data, f)
-        print(f"[AI] Model saved to {path}")
+        if log_suffix:
+            print(f"[AI] Model saved | {log_suffix} → {path}")
+        else:
+            print(f"[AI] Model saved to {path}")
 
-    def load(self, path: str | Path):
-        """Load network weights and training state from a pickle file."""
+    def load(self, path: str | Path) -> bool:
         with open(path, "rb") as f:
             data = pickle.load(f)
+        w1 = data["params"]["W1"]
+        if w1.shape[0] != INPUT_DIM:
+            print(
+                f"[AI] Ignoring incompatible checkpoint (input dim {w1.shape[0]}, "
+                f"need {INPUT_DIM}) — starting fresh weights."
+            )
+            return False
         for k, v in data["params"].items():
             setattr(self.q_net, k, v)
         self.epsilon = data["epsilon"]
         self._steps = data["steps"]
         self._sync_target()
         print(f"[AI] Model loaded from {path}")
+        return True
