@@ -2,8 +2,9 @@
 SpymasterAgent — ties embeddings and Q-learning together.
 
 Typical call sequence per AI turn:
-    suggestion = agent.suggest(view)
+    suggestion = agent.suggest(view, capture_for_learning=True)
     # → {"clue": str, "number": int, "covered": list[str]}
+    # Use capture_for_learning=False in play mode so guesses are not trained on.
 
 After the human operative finishes guessing:
     agent.record_outcome(outcomes, next_view, done)
@@ -60,7 +61,12 @@ class SpymasterAgent:
         if save_path.exists():
             self._agent.load(save_path)
 
-    def suggest(self, view: SpymasterBoardView) -> dict | None:
+    def suggest(
+        self,
+        view: SpymasterBoardView,
+        *,
+        capture_for_learning: bool = True,
+    ) -> dict | None:
         model = load_model()
 
         state = self._state_from_view(view, model)
@@ -80,16 +86,12 @@ class SpymasterAgent:
         if result is None:
             return None
 
-        clue_word, number, action_vec = result
+        clue_word, number, action_vec, covered = result
 
-        covered = next(
-            (c for w, _, c, _ in candidates if w == clue_word),
-            [],
-        )
-
-        self._last_state = state
-        self._last_action_vec = action_vec
-        self._last_covered = covered
+        if capture_for_learning:
+            self._last_state = state
+            self._last_action_vec = action_vec
+            self._last_covered = covered
 
         return {"clue": clue_word, "number": number, "covered": covered}
 

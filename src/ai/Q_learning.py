@@ -13,7 +13,7 @@ Network: 501 → 128 → 64 → 1  (ReLU activations, Adam optimizer, pure numpy
 
 Training loop (called from main_window after each human guess):
   1. agent.build_state(...)         → state vector
-  2. agent.select_action(state, candidates)   → (clue, number, action_vec)
+  2. agent.select_action(state, candidates)   → (clue, number, action_vec, covered)
   3. human guesses → reward computed
   4. agent.store_transition(state, action_vec, reward, next_best_q, done)
   5. agent.train_step()             → one gradient update
@@ -197,7 +197,7 @@ class QLearningAgent:
     Wraps QNetwork + ReplayBuffer and exposes a simple interface for the UI:
 
         state      = agent.build_state(team_vecs, opp_vecs, neu_vecs, ass_vecs)
-        clue, num, action_vec = agent.select_action(state, candidates)
+        clue, num, action_vec, _ = agent.select_action(state, candidates)
         # ... human guesses, reward computed ...
         next_best_q = agent.best_q(next_state, next_candidates)
         agent.store_transition(state, action_vec, reward, next_best_q, done)
@@ -272,22 +272,21 @@ class QLearningAgent:
         self,
         state: np.ndarray,
         candidates: list[tuple[str, float, list[str], np.ndarray]],
-    ) -> tuple[str, int, np.ndarray] | None:
+    ) -> tuple[str, int, np.ndarray, list[str]] | None:
         """
         Epsilon-greedy action selection.
 
         candidates : list of (clue_word, embed_score, covered_words, clue_vec)
                      as returned by candidate_clues() with clue_vec appended.
-        Returns (clue_word, number, action_vec), or None if no candidates.
+        Returns (clue_word, number, action_vec, covered_words), or None if no candidates.
+        The same clue word may appear with different covered lengths; covered matches number.
         """
         if not candidates:
             return None
 
         if np.random.rand() < self.epsilon:
-            # Explore: pick a random candidate.
             clue_word, _, covered, clue_vec = candidates[np.random.randint(len(candidates))]
         else:
-            # Exploit: pick the candidate with the highest Q-value.
             best_q_val = -np.inf
             best = candidates[0]
             for candidate in candidates:
@@ -302,7 +301,7 @@ class QLearningAgent:
 
         number = max(1, len(covered))
         action_vec = self.build_action_vec(clue_vec, number)
-        return clue_word, number, action_vec
+        return clue_word, number, action_vec, covered
 
     # ── Training ───────────────────────────────────────────────────────────────
 

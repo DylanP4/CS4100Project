@@ -187,7 +187,7 @@ class MainWindow(QMainWindow):
             return
 
         view = self._board_view_for_team(self._engine.current_team)
-        suggestion = self._ai.suggest(view)
+        suggestion = self._ai.suggest(view, capture_for_learning=self._training_mode)
         if suggestion is None:
             self._show_message("AI Suggest", "No good clue found for this board.")
             return
@@ -196,7 +196,7 @@ class MainWindow(QMainWindow):
         num = suggestion["number"]
         covered = suggestion["covered"]
 
-        self._ai_active_turn = True
+        self._ai_active_turn = self._training_mode
         self._ai_team = self._engine.current_team
         self._turn_outcomes = []
         self._game_view.clue_stack.set_clue(clue, num, covered)
@@ -208,7 +208,9 @@ class MainWindow(QMainWindow):
             )
 
     def _record_ai_outcome(self, done: bool):
-        """Store transition and trigger a training step."""
+        """Store transition and trigger a training step (training mode only)."""
+        if not self._training_mode:
+            return
         next_view = EMPTY_BOARD_VIEW if done else self._board_view_for_team(self._ai_team)
         self._ai.record_outcome(
             self._turn_outcomes,

@@ -8,9 +8,11 @@ Loads a pre-trained gensim model (default: GloVe 100d) and exposes:
 The model is downloaded once (~130 MB) to ~/gensim-data and cached locally.
 """
 
-import random
+from collections import defaultdict
 
 import numpy as np
+
+from ai.clue_lexicon import is_allowed_clue_lexeme
 from gensim import downloader as api
 from gensim.models import KeyedVectors
 from scipy.spatial.distance import cosine as cosine_distance
@@ -44,8 +46,12 @@ def _cosine_sim(a: np.ndarray, b: np.ndarray) -> float:
 
 EXTRA_TARGET_BREADTH_BIAS = 0.4
 
-# When scoring a clue, only the strongest links (by similarity) can be selected as targets.
+# Pool of team words linked to a clue (by similarity); Q-learning picks how many to use.
 MAX_STRONG_TEAM_LINKS = 12
+# How many distinct clue words to expand (each becomes up to MAX_TARGET_COUNT actions).
+MAX_CLUE_ROOTS = 22
+# Only k=1..3 targets per clue are offered to Q-learning (tight Codenames play).
+MAX_TARGET_COUNT = 3
 
 # Extra similarity to assassin / opponent / neutral hurts more than a flat "avoid" pool.
 ASSASSIN_PENALTY_WEIGHT = 5.0
@@ -66,36 +72,6 @@ def _weighted_excess_sim_penalty(
     )
 
 
-def _sample_target_word_count(n_available: int) -> int:
-    """
-    How many team words to tie to this clue candidate.
-
-    Biased toward 1–2, sometimes 3, rarely 4+ (when that many strong links exist).
-    """
-    if n_available <= 0:
-        return 0
-    if n_available == 1:
-        return 1
-    r = random.random()
-    if n_available == 2:
-        return 1 if r < 0.42 else 2
-    if n_available == 3:
-        if r < 0.30:
-            return 1
-        if r < 0.72:
-            return 2
-        return 3
-    # 4+ links in pool
-    if r < 0.30:
-        return 1
-    if r < 0.72:
-        return 2
-    if r < 0.93:
-        return 3
-    hi = min(n_available, 6)
-    return random.randint(4, hi)
-
-
 def candidate_clues(
     team_words: list[str],
     opponent_words: list[str],
@@ -106,13 +82,17 @@ def candidate_clues(
     avoid_penalty_floor: float = 0.2,
 ) -> list[tuple[str, float, list[str]]]:
     """
-    Return the top_n candidate one-word clues for the current spymaster turn.
+    Return discrete clue actions (clue word + target count k) for Q-learning.
+
+    `top_n` scales how many actions are returned (cap ~max(top_n*6, 150)).
 
     opponent_words / neutral_words / assassin_words must be the unrevealed non-team
     cards for this clue-giver's team so penalties match real risk (assassin weighted
     highest, then opponent, then neutral).
 
-    Ranking uses breadth bias and random target count (see _sample_target_word_count).
+    For each clue word, up to three actions: k=1, 2, 3 team targets (prefix of the
+    similarity-sorted pool). Q-learning picks the clue and k. Cosine similarity only
+    builds the pool and heuristic scores, not k beyond that cap.
     """
     model = load_model()
 
@@ -134,11 +114,16 @@ def candidate_clues(
     mean_team_vec = np.mean([v for _, v in team_vecs], axis=0)
     raw_candidates = model.most_similar(positive=[mean_team_vec], topn=top_n * 6)
 
-    results = []
+    by_clue: dict[str, list[tuple[float, list[str]]]] = defaultdict(list)
+    clue_roots = 0
     for clue_word, _ in raw_candidates:
+        if clue_roots >= MAX_CLUE_ROOTS:
+            break
         if clue_word.upper() in board_upper:
             continue
         if not clue_word.isalpha():
+            continue
+        if not is_allowed_clue_lexeme(clue_word):
             continue
 
         clue_vec = model[clue_word]
@@ -149,10 +134,8 @@ def candidate_clues(
             continue
         strong.sort(key=lambda x: x[1], reverse=True)
         pool = strong[:MAX_STRONG_TEAM_LINKS]
-        k = _sample_target_word_count(len(pool))
-        picked = pool[:k]
-        covered = [team_display.get(w, w) for w, _ in picked]
-        team_score = sum(s for _, s in picked)
+        clue_roots += 1
+
         danger = (
             _weighted_excess_sim_penalty(
                 clue_vec, assassin_vecs, avoid_penalty_floor, ASSASSIN_PENALTY_WEIGHT
@@ -164,12 +147,26 @@ def candidate_clues(
                 clue_vec, neutral_vecs, avoid_penalty_floor, NEUTRAL_PENALTY_WEIGHT
             )
         )
-        base = team_score - danger
-        n = len(covered)
-        breadth_div = 1.0 + EXTRA_TARGET_BREADTH_BIAS * max(0, n - 1)
-        score = base / breadth_div
 
-        results.append((clue_word, score, covered))
+        max_k = min(len(pool), MAX_TARGET_COUNT)
+        for k in range(1, max_k + 1):
+            picked = pool[:k]
+            covered = [team_display.get(w, w) for w, _ in picked]
+            team_score = sum(s for _, s in picked)
+            base = team_score - danger
+            breadth_div = 1.0 + EXTRA_TARGET_BREADTH_BIAS * max(0, k - 1)
+            score = base / breadth_div
+            by_clue[clue_word].append((score, covered))
 
-    results.sort(key=lambda x: x[1], reverse=True)
-    return results[:top_n]
+    ranked_roots = sorted(
+        by_clue.keys(),
+        key=lambda cw: max(s for s, _ in by_clue[cw]),
+        reverse=True,
+    )
+    out: list[tuple[str, float, list[str]]] = []
+    for cw in ranked_roots:
+        for sc, cov in sorted(by_clue[cw], key=lambda x: len(x[1])):
+            out.append((cw, sc, cov))
+
+    cap = min(len(out), max(top_n * 6, 150))
+    return out[:cap]
