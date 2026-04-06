@@ -1,23 +1,24 @@
 """
 SpymasterAgent — ties embeddings and Q-learning together.
 
-This is the only class main_window.py needs to interact with.
-
 Typical call sequence per AI turn:
-    suggestion = agent.suggest(team_words, all_board_words)
-    # → {"clue": "ocean", "number": 2, "covered": ["SEA", "WAVE"]}
+    suggestion = agent.suggest(view, capture_for_learning=True)
+    # → {"clue": str, "number": int, "covered": list[str]}
+    # Use capture_for_learning=False in play mode so guesses are not trained on.
 
 After the human operative finishes guessing:
-    agent.record_outcome(outcome, next_team_words, next_all_board_words, done)
-    # outcome: list of guess results, e.g. ["correct", "neutral"]
+    agent.record_outcome(outcomes, next_view, done)
 """
 
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 
-from ai.embeddings import candidate_clues, get_embedding, load_model
+from ai.embeddings import candidate_clues, load_model
 from ai.Q_learning import (
+    BATCH_SIZE,
+    BUFFER_CAPACITY,
     REWARD_ASSASSIN,
     REWARD_CORRECT,
     REWARD_NEUTRAL,
@@ -25,10 +26,21 @@ from ai.Q_learning import (
     QLearningAgent,
 )
 
-# Where the trained model is saved between sessions.
 DEFAULT_SAVE_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "agent.pkl"
 
-# Outcome strings that come from game_engine.guess()
+
+@dataclass(frozen=True)
+class SpymasterBoardView:
+    """Unrevealed words on the board from the clue-giver's team perspective."""
+
+    team_words: list[str]
+    opponent_words: list[str]
+    neutral_words: list[str]
+    assassin_words: list[str]
+
+
+EMPTY_BOARD_VIEW = SpymasterBoardView([], [], [], [])
+
 _OUTCOME_REWARD = {
     "correct": REWARD_CORRECT,
     "neutral": REWARD_NEUTRAL,
@@ -38,24 +50,10 @@ _OUTCOME_REWARD = {
 
 
 class SpymasterAgent:
-    """
-    High-level AI spymaster.
-
-    Responsibilities
-    ----------------
-    1. Convert board words → embedding vectors (via embeddings.py).
-    2. Generate candidate clues (via candidate_clues()).
-    3. Pick the best clue via Q-learning (via QLearningAgent.select_action()).
-    4. After the human operative guesses, record the outcome and trigger a
-       training step so the agent learns from the interaction.
-    """
-
     def __init__(self, save_path: Path = DEFAULT_SAVE_PATH):
         self._agent = QLearningAgent()
         self._save_path = save_path
 
-        # Persisted state across calls — needed to store the transition after
-        # the human finishes guessing.
         self._last_state: np.ndarray | None = None
         self._last_action_vec: np.ndarray | None = None
         self._last_covered: list[str] = []
@@ -63,128 +61,108 @@ class SpymasterAgent:
         if save_path.exists():
             self._agent.load(save_path)
 
-    # ── Public API ─────────────────────────────────────────────────────────────
-
     def suggest(
         self,
-        team_words: list[str],
-        all_board_words: list[str],
+        view: SpymasterBoardView,
+        *,
+        capture_for_learning: bool = True,
     ) -> dict | None:
-        """
-        Generate the AI's clue for this turn.
-
-        Parameters
-        ----------
-        team_words      : unrevealed words belonging to the AI's team.
-        all_board_words : all words currently on the board (revealed + unrevealed).
-
-        Returns
-        -------
-        {"clue": str, "number": int, "covered": list[str]}
-        or None if no candidates could be generated.
-        """
         model = load_model()
 
-        # Build vectors for state representation.
-        team_vecs, avoid_vecs = self._split_vecs(team_words, all_board_words, model)
-        state = self._agent.build_state(team_vecs, avoid_vecs)
+        state = self._state_from_view(view, model)
 
-        # Get candidate clues and attach their embedding vectors.
-        raw_candidates = candidate_clues(team_words, all_board_words)
+        raw_candidates = candidate_clues(
+            view.team_words,
+            view.opponent_words,
+            view.neutral_words,
+            view.assassin_words,
+        )
         if not raw_candidates:
             return None
 
         candidates = self._attach_vecs(raw_candidates, model)
 
-        # Ask the Q-agent to pick one.
         result = self._agent.select_action(state, candidates)
         if result is None:
             return None
 
-        clue_word, number, action_vec = result
+        clue_word, number, action_vec, covered = result
 
-        # Find the covered words for the chosen clue.
-        covered = next(
-            (c for w, _, c, _ in candidates if w == clue_word),
-            [],
-        )
-
-        # Persist state/action so record_outcome() can complete the transition.
-        self._last_state = state
-        self._last_action_vec = action_vec
-        self._last_covered = covered
+        if capture_for_learning:
+            self._last_state = state
+            self._last_action_vec = action_vec
+            self._last_covered = covered
 
         return {"clue": clue_word, "number": number, "covered": covered}
 
     def record_human_clue(
         self,
-        team_words: list[str],
-        all_board_words: list[str],
+        view: SpymasterBoardView,
         clue_word: str,
         number: int,
+        intended_team_words: list[str] | None = None,
+        *,
+        log_training: bool = False,
     ) -> bool:
-        """
-        Record a human-submitted clue as a training transition (training mode).
-
-        Builds state and action_vec from the human's clue so that
-        record_outcome() can complete the transition after the operative turn.
-
-        Returns False if clue_word is not in the GloVe vocabulary (can't train
-        on words the model has never seen), True otherwise.
-        """
         model = load_model()
         key = clue_word.lower()
         if key not in model:
             print(f"[AI] '{clue_word}' not in vocabulary — skipping this turn.")
             return False
 
-        team_vecs, avoid_vecs = self._split_vecs(team_words, all_board_words, model)
-        state = self._agent.build_state(team_vecs, avoid_vecs)
+        team_upper = {t.upper() for t in view.team_words}
+        intended = None
+        if intended_team_words:
+            intended = [w for w in intended_team_words if w.upper() in team_upper]
+            if not intended:
+                intended = None
+
+        state = self._state_from_view(view, model)
         clue_vec = model[key]
-        action_vec = self._agent.build_action_vec(clue_vec, number)
+        num_for_action = max(1, min(9, len(intended))) if intended else max(1, min(9, number))
+        action_vec = self._agent.build_action_vec(clue_vec, num_for_action)
 
         self._last_state = state
         self._last_action_vec = action_vec
-        self._last_covered = []
+        self._last_covered = list(intended) if intended else []
+        if log_training:
+            if intended:
+                print(
+                    f'[AI] training | human clue recorded: "{clue_word}" '
+                    f"n={num_for_action} intended=[{', '.join(intended)}]"
+                )
+            else:
+                print(
+                    f'[AI] training | human clue recorded: "{clue_word}" '
+                    f"number={number} (no target checkboxes — using number field)"
+                )
         return True
 
     def record_outcome(
         self,
         outcomes: list[str],
-        next_team_words: list[str],
-        next_all_board_words: list[str],
+        next_view: SpymasterBoardView,
         done: bool,
+        *,
+        log_training: bool = False,
     ):
-        """
-        Call this after the human operative finishes guessing to give the agent
-        feedback and trigger a training step.
-
-        Parameters
-        ----------
-        outcomes            : ordered list of guess results for this turn,
-                              e.g. ["correct", "correct", "neutral"].
-                              Each string must be one of: correct, neutral,
-                              opponent, assassin.
-        next_team_words     : unrevealed team words after the turn.
-        next_all_board_words: all board words after the turn.
-        done                : True if the game ended this turn.
-        """
         if self._last_state is None or self._last_action_vec is None:
-            return  # suggest() was never called this turn
+            return
 
         reward = sum(_OUTCOME_REWARD.get(o, 0.0) for o in outcomes)
 
         model = load_model()
-        next_team_vecs, next_avoid_vecs = self._split_vecs(
-            next_team_words, next_all_board_words, model
-        )
-        next_state = self._agent.build_state(next_team_vecs, next_avoid_vecs)
+        next_state = self._state_from_view(next_view, model)
 
-        # Compute max Q over next state's candidates for the Bellman target.
         if done:
             next_best_q = 0.0
         else:
-            next_raw = candidate_clues(next_team_words, next_all_board_words)
+            next_raw = candidate_clues(
+                next_view.team_words,
+                next_view.opponent_words,
+                next_view.neutral_words,
+                next_view.assassin_words,
+            )
             next_candidates = self._attach_vecs(next_raw, model)
             next_best_q = self._agent.best_q(next_state, next_candidates)
 
@@ -197,45 +175,42 @@ class SpymasterAgent:
         )
 
         loss = self._agent.train_step()
-        if loss is not None:
-            print(f"[AI] train loss={loss:.4f}  ε={self._agent.epsilon:.3f}")
-
         self._agent.decay_epsilon()
-        self._agent.save(self._save_path)
 
-        # Clear persisted state.
+        buf_n = len(self._agent.buffer)
+        out_str = ",".join(outcomes) if outcomes else "(none)"
+        loss_str = f"{loss:.4f}" if loss is not None else f"n/a (buffer < {BATCH_SIZE})"
+        log_suffix = (
+            f"reward={reward:.2f} guesses=[{out_str}] turn_done={done} "
+            f"train_loss={loss_str} replay={buf_n}/{BUFFER_CAPACITY} "
+            f"ε={self._agent.epsilon:.4f} grad_steps={self._agent._steps}"
+        )
+        self._agent.save(
+            self._save_path,
+            log_suffix=log_suffix if log_training else "",
+        )
+
         self._last_state = None
         self._last_action_vec = None
         self._last_covered = []
 
-    # ── Helpers ────────────────────────────────────────────────────────────────
-
     @staticmethod
-    def _split_vecs(
-        team_words: list[str],
-        all_board_words: list[str],
-        model,
-    ) -> tuple[list[np.ndarray], list[np.ndarray]]:
-        """Split board words into team vectors and avoid vectors."""
-        team_upper = {w.upper() for w in team_words}
-        team_vecs = [
-            model[w.lower()]
-            for w in team_words
-            if w.lower() in model
-        ]
-        avoid_vecs = [
-            model[w.lower()]
-            for w in all_board_words
-            if w.upper() not in team_upper and w.lower() in model
-        ]
-        return team_vecs, avoid_vecs
+    def _embed_words(words: list[str], model) -> list[np.ndarray]:
+        return [model[w.lower()] for w in words if w.lower() in model]
+
+    def _state_from_view(self, view: SpymasterBoardView, model) -> np.ndarray:
+        return self._agent.build_state(
+            self._embed_words(view.team_words, model),
+            self._embed_words(view.opponent_words, model),
+            self._embed_words(view.neutral_words, model),
+            self._embed_words(view.assassin_words, model),
+        )
 
     @staticmethod
     def _attach_vecs(
         raw_candidates: list[tuple[str, float, list[str]]],
         model,
     ) -> list[tuple[str, float, list[str], np.ndarray]]:
-        """Attach the clue word's embedding vector to each candidate tuple."""
         result = []
         for clue_word, score, covered in raw_candidates:
             key = clue_word.lower()

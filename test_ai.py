@@ -20,6 +20,13 @@ import numpy as np
 from ai.embeddings import candidate_clues, load_model
 from ai.Q_learning import BATCH_SIZE, QLearningAgent
 
+# Synthetic 25-card layout split by Codenames role — test fixture only, not from the real app.
+team_words = ["OCEAN", "FISH", "WAVE", "BEACH", "SHELL"]
+opponent_words = ["KNIFE", "BLOOD", "FIRE", "ROCK", "TREE"]
+neutral_words = ["KING", "QUEEN", "CAR", "PLANE"]
+assassin_words = ["BANK"]
+all_board_words = team_words + opponent_words + neutral_words + assassin_words
+
 # ── 1. Load model ──────────────────────────────────────────────────────────────
 print("=" * 60)
 print("STEP 1: Loading GloVe model...")
@@ -29,10 +36,9 @@ print("OK\n")
 # ── 2. Candidate clues ─────────────────────────────────────────────────────────
 print("=" * 60)
 print("STEP 2: candidate_clues() on a sample board")
-team_words = ["OCEAN", "FISH", "WAVE", "BEACH", "SHELL"]
-all_board_words = team_words + ["KNIFE", "BLOOD", "FIRE", "ROCK", "TREE",
-                                 "KING", "QUEEN", "CAR", "PLANE", "BANK"]
-candidates = candidate_clues(team_words, all_board_words, top_n=5)
+candidates = candidate_clues(
+    team_words, opponent_words, neutral_words, assassin_words, top_n=5
+)
 print(f"Top 5 candidates for team words {team_words}:")
 for clue, score, covered in candidates:
     print(f"  {clue:<15} score={score:.3f}  covers={covered}")
@@ -45,13 +51,14 @@ agent = QLearningAgent(epsilon=0.0)  # epsilon=0 so it always exploits
 
 model = load_model()
 
-def make_state(t_words, a_words):
-    t_vecs = [model[w.lower()] for w in t_words if w.lower() in model]
-    a_vecs = [model[w.lower()] for w in a_words if w.lower() in model]
-    return agent.build_state(t_vecs, a_vecs)
+def make_state():
+    t_vecs = [model[w.lower()] for w in team_words if w.lower() in model]
+    o_vecs = [model[w.lower()] for w in opponent_words if w.lower() in model]
+    n_vecs = [model[w.lower()] for w in neutral_words if w.lower() in model]
+    a_vecs = [model[w.lower()] for w in assassin_words if w.lower() in model]
+    return agent.build_state(t_vecs, o_vecs, n_vecs, a_vecs)
 
-avoid_words = [w for w in all_board_words if w not in team_words]
-state = make_state(team_words, avoid_words)
+state = make_state()
 
 for clue, score, covered in candidates:
     clue_vec = model[clue.lower()]

@@ -1,9 +1,9 @@
 from PyQt6.QtCore import QThread, pyqtSignal
 from PyQt6.QtWidgets import QMainWindow, QMessageBox, QVBoxLayout, QWidget
 
-from ai.agent import SpymasterAgent
+from ai.agent import EMPTY_BOARD_VIEW, SpymasterAgent, SpymasterBoardView
 from ai.embeddings import load_model
-from constants import PHASE_OPERATIVE, PHASE_SPYMASTER, RED
+from constants import ASSASSIN, BLUE, NEUTRAL, PHASE_OPERATIVE, PHASE_SPYMASTER, RED
 from game_engine import GameEngine
 from ui.components import GameView, Toolbar
 from ui.styles import global_stylesheet
@@ -96,17 +96,23 @@ class MainWindow(QMainWindow):
         self._turn_outcomes = []
         self._refresh_ui()
 
-    def _on_submit_clue(self, word, number):
+    def _on_submit_clue(self, word, number, intended_targets=None):
+        if intended_targets is None:
+            intended_targets = []
         ok, msg = self._engine.submit_clue(word, number)
         if not ok and msg:
             self._show_message("Invalid clue", msg)
             return
         self._turn_outcomes = []
-        # In training mode, record every human clue as a training transition.
         if self._training_mode and not self._ai_active_turn:
-            team_words = self._unrevealed_words_for(self._engine.current_team)
-            all_board_words = self._unrevealed_board_words()
-            recorded = self._ai.record_human_clue(team_words, all_board_words, word, number)
+            view = self._board_view_for_team(self._engine.current_team)
+            recorded = self._ai.record_human_clue(
+                view,
+                word,
+                number,
+                intended_team_words=intended_targets if intended_targets else None,
+                log_training=self._training_mode,
+            )
             if recorded:
                 self._ai_active_turn = True
                 self._ai_team = self._engine.current_team
@@ -150,23 +156,28 @@ class MainWindow(QMainWindow):
                 _team_label(self._engine.winner) + " team wins!",
             )
         elif prev_phase == PHASE_OPERATIVE and self._engine.phase == PHASE_SPYMASTER:
-            # Turn ended naturally (neutral/opponent hit, or out of guesses).
             if self._ai_active_turn:
                 self._record_ai_outcome(done=False)
                 self._ai_active_turn = False
-
         self._refresh_ui()
 
     # ── AI ─────────────────────────────────────────────────────────────────────
 
     def _on_model_ready(self):
         self._ai_ready = True
-        print("[AI] Word vectors ready.")
+        if self._training_mode:
+            print(
+                "[AI] training | GloVe finished loading in background — "
+                "AI Suggest and learning are ready."
+            )
 
     def _on_model_failed(self, error: str):
         self._show_message("AI Error", f"Failed to load word vectors:\n{error}")
 
     def _on_ai_suggest(self):
+        self._run_ai_suggestion()
+
+    def _run_ai_suggestion(self):
         if not self._ai_ready:
             self._show_message("AI Suggest", "Still loading word vectors, please wait a moment.")
             return
@@ -175,38 +186,37 @@ class MainWindow(QMainWindow):
         if self._engine.phase != PHASE_SPYMASTER:
             return
 
-        team_words = self._unrevealed_words_for(self._engine.current_team)
-        all_board_words = self._unrevealed_board_words()
-
-        suggestion = self._ai.suggest(team_words, all_board_words)
+        view = self._board_view_for_team(self._engine.current_team)
+        suggestion = self._ai.suggest(view, capture_for_learning=self._training_mode)
         if suggestion is None:
             self._show_message("AI Suggest", "No good clue found for this board.")
             return
 
-        self._ai_active_turn = True
+        clue = suggestion["clue"]
+        num = suggestion["number"]
+        covered = suggestion["covered"]
+
+        self._ai_active_turn = self._training_mode
         self._ai_team = self._engine.current_team
         self._turn_outcomes = []
-
-        self._game_view.clue_stack.set_clue(
-            suggestion["clue"],
-            suggestion["number"],
-            suggestion["covered"],
-        )
+        self._game_view.clue_stack.set_clue(clue, num, covered)
+        if self._training_mode:
+            cov = ", ".join(covered[:5]) + (" …" if len(covered) > 5 else "")
+            print(
+                f'[AI] training | AI Suggest filled clue="{clue}" n={num} '
+                f"targets=[{cov}] — press Submit Clue to lock it in."
+            )
 
     def _record_ai_outcome(self, done: bool):
-        """Store transition and trigger a training step."""
-        if done:
-            next_team_words = []
-            next_board_words = []
-        else:
-            next_team_words = self._unrevealed_words_for(self._ai_team)
-            next_board_words = self._unrevealed_board_words()
-
+        """Store transition and trigger a training step (training mode only)."""
+        if not self._training_mode:
+            return
+        next_view = EMPTY_BOARD_VIEW if done else self._board_view_for_team(self._ai_team)
         self._ai.record_outcome(
             self._turn_outcomes,
-            next_team_words,
-            next_board_words,
+            next_view,
             done,
+            log_training=self._training_mode,
         )
 
     # ── Board helpers ──────────────────────────────────────────────────────────
@@ -228,6 +238,29 @@ class MainWindow(QMainWindow):
             for i in range(board.SIZE)
             if not board.is_revealed(i)
         ]
+
+    def _board_view_for_team(self, team: str) -> SpymasterBoardView:
+        """Unrevealed cards split by role for the given spymaster's team."""
+        board = self._engine.board
+        other = BLUE if team == RED else RED
+        team_w: list[str] = []
+        opponent_w: list[str] = []
+        neutral_w: list[str] = []
+        assassin_w: list[str] = []
+        for i in range(board.SIZE):
+            if board.is_revealed(i):
+                continue
+            w = board.word_at(i)
+            k = board.key_at(i)
+            if k == team:
+                team_w.append(w)
+            elif k == ASSASSIN:
+                assassin_w.append(w)
+            elif k == NEUTRAL:
+                neutral_w.append(w)
+            elif k == other:
+                opponent_w.append(w)
+        return SpymasterBoardView(team_w, opponent_w, neutral_w, assassin_w)
 
     # ── UI helpers ─────────────────────────────────────────────────────────────
 
@@ -251,6 +284,7 @@ class MainWindow(QMainWindow):
             board_widget.load_board([], [], [])
             board_widget.set_operative_guessing(False)
             clue_stack.show_spymaster()
+            clue_stack.configure_training_spymaster(False, [])
             self._toolbar.set_start_enabled(True)
             return
 
@@ -266,13 +300,21 @@ class MainWindow(QMainWindow):
         if engine.game_over:
             board_widget.set_operative_guessing(False)
             clue_stack.show_spymaster()
+            clue_stack.configure_training_spymaster(False, [])
             self._toolbar.set_start_enabled(True)
             return
 
         if engine.phase == PHASE_SPYMASTER:
             clue_stack.show_spymaster()
             board_widget.set_operative_guessing(False)
+            team_for_picker = (
+                self._unrevealed_words_for(engine.current_team)
+                if self._training_mode
+                else []
+            )
+            clue_stack.configure_training_spymaster(self._training_mode, team_for_picker)
         else:
+            clue_stack.configure_training_spymaster(False, [])
             clue_stack.show_operative()
             clue_stack.update_guess_panel(engine.clue_word, engine.guesses_left)
             board_widget.set_operative_guessing(engine.guesses_left > 0)

@@ -8,7 +8,11 @@ Loads a pre-trained gensim model (default: GloVe 100d) and exposes:
 The model is downloaded once (~130 MB) to ~/gensim-data and cached locally.
 """
 
+from collections import defaultdict
+
 import numpy as np
+
+from ai.clue_lexicon import is_allowed_clue_lexeme
 from gensim import downloader as api
 from gensim.models import KeyedVectors
 from scipy.spatial.distance import cosine as cosine_distance
@@ -40,72 +44,129 @@ def _cosine_sim(a: np.ndarray, b: np.ndarray) -> float:
     return float(1.0 - cosine_distance(a, b))
 
 
+EXTRA_TARGET_BREADTH_BIAS = 0.4
+
+# Pool of team words linked to a clue (by similarity); Q-learning picks how many to use.
+MAX_STRONG_TEAM_LINKS = 12
+# How many distinct clue words to expand (each becomes up to MAX_TARGET_COUNT actions).
+MAX_CLUE_ROOTS = 22
+# Only k=1..3 targets per clue are offered to Q-learning (tight Codenames play).
+MAX_TARGET_COUNT = 3
+
+# Extra similarity to assassin / opponent / neutral hurts more than a flat "avoid" pool.
+ASSASSIN_PENALTY_WEIGHT = 5.0
+OPPONENT_PENALTY_WEIGHT = 1.7
+NEUTRAL_PENALTY_WEIGHT = 1.0
+
+
+def _weighted_excess_sim_penalty(
+    clue_vec: np.ndarray,
+    word_vecs: list[np.ndarray],
+    floor: float,
+    weight: float,
+) -> float:
+    if not word_vecs or weight <= 0:
+        return 0.0
+    return weight * sum(
+        max(0.0, _cosine_sim(clue_vec, v) - floor) for v in word_vecs
+    )
+
+
 def candidate_clues(
     team_words: list[str],
-    all_board_words: list[str],
+    opponent_words: list[str],
+    neutral_words: list[str],
+    assassin_words: list[str],
     top_n: int = 50,
     sim_threshold: float = 0.3,
     avoid_penalty_floor: float = 0.2,
 ) -> list[tuple[str, float, list[str]]]:
     """
-    Return the top_n candidate one-word clues for the current spymaster turn.
+    Return discrete clue actions (clue word + target count k) for Q-learning.
 
-    Parameters
-    ----------
-    team_words      : unrevealed words belonging to the AI's team.
-    all_board_words : all 25 words still on the board (revealed + unrevealed).
-    top_n           : number of candidates to return.
-    sim_threshold   : minimum cosine similarity for a team word to count as "covered".
-    avoid_penalty_floor : similarity above this to a non-team word incurs a penalty.
+    `top_n` scales how many actions are returned (cap ~max(top_n*6, 150)).
 
-    Returns
-    -------
-    List of (clue_word, score, covered_team_words) sorted by score descending.
-    score = sum(sim to covered team words) - sum(excess sim to non-team board words)
+    opponent_words / neutral_words / assassin_words must be the unrevealed non-team
+    cards for this clue-giver's team so penalties match real risk (assassin weighted
+    highest, then opponent, then neutral).
+
+    For each clue word, up to three actions: k=1, 2, 3 team targets (prefix of the
+    similarity-sorted pool). Q-learning picks the clue and k. Cosine similarity only
+    builds the pool and heuristic scores, not k beyond that cap.
     """
     model = load_model()
 
-    board_upper = {w.upper() for w in all_board_words}
+    board_upper = {
+        w.upper()
+        for w in (team_words + opponent_words + neutral_words + assassin_words)
+    }
     team_lower = [w.lower() for w in team_words]
-    avoid_lower = [
-        w.lower()
-        for w in all_board_words
-        if w.upper() not in {t.upper() for t in team_words}
-    ]
 
     team_vecs = [(w, model[w]) for w in team_lower if w in model]
-    avoid_vecs = [(w, model[w]) for w in avoid_lower if w in model]
+    team_display = {w.lower(): w for w in team_words}
+    opponent_vecs = [model[w.lower()] for w in opponent_words if w.lower() in model]
+    neutral_vecs = [model[w.lower()] for w in neutral_words if w.lower() in model]
+    assassin_vecs = [model[w.lower()] for w in assassin_words if w.lower() in model]
 
     if not team_vecs:
         return []
 
-    # Seed candidates from words most similar to the mean team embedding.
     mean_team_vec = np.mean([v for _, v in team_vecs], axis=0)
     raw_candidates = model.most_similar(positive=[mean_team_vec], topn=top_n * 6)
 
-    results = []
+    by_clue: dict[str, list[tuple[float, list[str]]]] = defaultdict(list)
+    clue_roots = 0
     for clue_word, _ in raw_candidates:
-        # Must not be a board word (case-insensitive) and must be purely alphabetic.
+        if clue_roots >= MAX_CLUE_ROOTS:
+            break
         if clue_word.upper() in board_upper:
             continue
         if not clue_word.isalpha():
+            continue
+        if not is_allowed_clue_lexeme(clue_word):
             continue
 
         clue_vec = model[clue_word]
 
         team_sims = [(_w, _cosine_sim(clue_vec, v)) for _w, v in team_vecs]
-        covered = [_w for _w, s in team_sims if s >= sim_threshold]
-
-        if not covered:
+        strong = [(_w, s) for _w, s in team_sims if s >= sim_threshold]
+        if not strong:
             continue
+        strong.sort(key=lambda x: x[1], reverse=True)
+        pool = strong[:MAX_STRONG_TEAM_LINKS]
+        clue_roots += 1
 
-        team_score = sum(s for _, s in team_sims if s >= sim_threshold)
-        avoid_penalty = sum(
-            max(0.0, _cosine_sim(clue_vec, v) - avoid_penalty_floor)
-            for _, v in avoid_vecs
+        danger = (
+            _weighted_excess_sim_penalty(
+                clue_vec, assassin_vecs, avoid_penalty_floor, ASSASSIN_PENALTY_WEIGHT
+            )
+            + _weighted_excess_sim_penalty(
+                clue_vec, opponent_vecs, avoid_penalty_floor, OPPONENT_PENALTY_WEIGHT
+            )
+            + _weighted_excess_sim_penalty(
+                clue_vec, neutral_vecs, avoid_penalty_floor, NEUTRAL_PENALTY_WEIGHT
+            )
         )
 
-        results.append((clue_word, team_score - avoid_penalty, covered))
+        max_k = min(len(pool), MAX_TARGET_COUNT)
+        for k in range(1, max_k + 1):
+            picked = pool[:k]
+            covered = [team_display.get(w, w) for w, _ in picked]
+            team_score = sum(s for _, s in picked)
+            base = team_score - danger
+            breadth_div = 1.0 + EXTRA_TARGET_BREADTH_BIAS * max(0, k - 1)
+            score = base / breadth_div
+            by_clue[clue_word].append((score, covered))
 
-    results.sort(key=lambda x: x[1], reverse=True)
-    return results[:top_n]
+    ranked_roots = sorted(
+        by_clue.keys(),
+        key=lambda cw: max(s for s, _ in by_clue[cw]),
+        reverse=True,
+    )
+    out: list[tuple[str, float, list[str]]] = []
+    for cw in ranked_roots:
+        for sc, cov in sorted(by_clue[cw], key=lambda x: len(x[1])):
+            out.append((cw, sc, cov))
+
+    cap = min(len(out), max(top_n * 6, 150))
+    return out[:cap]

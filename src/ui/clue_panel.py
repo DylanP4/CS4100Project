@@ -1,4 +1,5 @@
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -8,6 +9,7 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
     QSpinBox,
     QStackedWidget,
+    QVBoxLayout,
     QWidget,
 )
 from PyQt6.QtCore import pyqtSignal
@@ -20,7 +22,7 @@ CLUE_NUM_MIN, CLUE_NUM_MAX = 1, 9
 
 
 class CluePanel(CardPanel):
-    submit_clue = pyqtSignal(str, int)
+    submit_clue = pyqtSignal(str, int, object)
     ai_suggest_requested = pyqtSignal()
 
     def __init__(self, parent=None):
@@ -53,6 +55,19 @@ class CluePanel(CardPanel):
         self._intended_label.setMinimumWidth(0)
         layout.addWidget(self._intended_label, 2, 1)
 
+        self._training_frame = QFrame()
+        training_outer = QVBoxLayout(self._training_frame)
+        training_outer.setContentsMargins(0, 0, 0, 0)
+        training_outer.addWidget(
+            QLabel("Training: check team words this clue is meant to target (optional):")
+        )
+        self._training_checks_host = QWidget()
+        self._training_checks_layout = QVBoxLayout(self._training_checks_host)
+        self._training_checks_layout.setContentsMargins(0, 0, 0, 0)
+        training_outer.addWidget(self._training_checks_host)
+        layout.addWidget(self._training_frame, 3, 0, 1, 2)
+        self._training_frame.setVisible(False)
+
         btn_row = QHBoxLayout()
         btn_row.setSpacing(10)
         submit_btn = QPushButton("Submit Clue")
@@ -64,15 +79,51 @@ class CluePanel(CardPanel):
         ai_btn.setMinimumHeight(BTN_HEIGHT)
         ai_btn.clicked.connect(self.ai_suggest_requested.emit)
         btn_row.addWidget(ai_btn)
-        layout.addLayout(btn_row, 3, 0, 1, 2)
+        layout.addLayout(btn_row, 4, 0, 1, 2)
 
     def _on_submit(self):
-        self.submit_clue.emit(self._clue_edit.text().strip(), self._number_spin.value())
+        targets = self._collect_training_targets()
+        self.submit_clue.emit(
+            self._clue_edit.text().strip(),
+            self._number_spin.value(),
+            targets,
+        )
+
+    def _collect_training_targets(self) -> list[str]:
+        if not self._training_frame.isVisible():
+            return []
+        out = []
+        for i in range(self._training_checks_layout.count()):
+            item = self._training_checks_layout.itemAt(i)
+            w = item.widget() if item else None
+            if isinstance(w, QCheckBox) and w.isChecked():
+                out.append(w.text())
+        return out
+
+    def set_training_target_picker(self, active: bool, team_words: list[str]):
+        while self._training_checks_layout.count():
+            item = self._training_checks_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        show = active and len(team_words) > 0
+        self._training_frame.setVisible(show)
+        if not show:
+            return
+        for w in team_words:
+            self._training_checks_layout.addWidget(QCheckBox(w))
 
     def clear_inputs(self):
         self._clue_edit.clear()
         self._number_spin.setValue(1)
         self._set_intended("")
+        self._uncheck_training_targets()
+
+    def _uncheck_training_targets(self):
+        for i in range(self._training_checks_layout.count()):
+            item = self._training_checks_layout.itemAt(i)
+            w = item.widget() if item else None
+            if isinstance(w, QCheckBox):
+                w.setChecked(False)
 
     def set_no_suggestion(self):
         self._clue_edit.clear()
@@ -119,7 +170,7 @@ class GuessPanel(CardPanel):
 
 
 class ClueGuessStack(QWidget):
-    submit_clue = pyqtSignal(str, int)
+    submit_clue = pyqtSignal(str, int, object)
     end_turn = pyqtSignal()
     ai_suggest_requested = pyqtSignal()
 
@@ -157,3 +208,6 @@ class ClueGuessStack(QWidget):
 
     def set_intended_words(self, words):
         self._clue_panel.set_intended_words(words)
+
+    def configure_training_spymaster(self, training: bool, team_words: list[str]):
+        self._clue_panel.set_training_target_picker(training, team_words)
