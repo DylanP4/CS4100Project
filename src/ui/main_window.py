@@ -1,7 +1,13 @@
 from PyQt6.QtCore import QThread, pyqtSignal
 from PyQt6.QtWidgets import QMainWindow, QMessageBox, QVBoxLayout, QWidget
 
-from ai.agent import EMPTY_BOARD_VIEW, SpymasterAgent, SpymasterBoardView
+from ai.agent import (
+    AI_AGENT_SAVE_PATH,
+    DEFAULT_SAVE_PATH,
+    EMPTY_BOARD_VIEW,
+    SpymasterAgent,
+    SpymasterBoardView,
+)
 from ai.embeddings import load_model
 from constants import ASSASSIN, BLUE, NEUTRAL, PHASE_OPERATIVE, PHASE_SPYMASTER, RED
 from game_engine import GameEngine
@@ -27,7 +33,7 @@ class _ModelLoader(QThread):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, training_mode: bool = False):
+    def __init__(self, training_mode: bool = False, use_ai_agent_file: bool = False):
         super().__init__()
         self._training_mode = training_mode
         title = "Codenames — TRAINING MODE" if training_mode else "Codenames"
@@ -39,7 +45,8 @@ class MainWindow(QMainWindow):
         self._engine = GameEngine()
         self._engine.set_on_state_change(self._refresh_ui)
 
-        self._ai = SpymasterAgent()
+        ckpt = AI_AGENT_SAVE_PATH if use_ai_agent_file else DEFAULT_SAVE_PATH
+        self._ai = SpymasterAgent(save_path=ckpt)
         self._ai_ready = False  # True once GloVe has finished loading
 
         # Tracks whether the AI suggested the clue for the current operative turn.

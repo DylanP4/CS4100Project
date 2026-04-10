@@ -27,6 +27,8 @@ from ai.Q_learning import (
 )
 
 DEFAULT_SAVE_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "agent.pkl"
+# Optional second Q-learning checkpoint (e.g. alternate data source); never overwrites agent.pkl.
+AI_AGENT_SAVE_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "ai_agent.pkl"
 
 
 @dataclass(frozen=True)
@@ -47,6 +49,10 @@ _OUTCOME_REWARD = {
     "opponent": REWARD_OPPONENT,
     "assassin": REWARD_ASSASSIN,
 }
+
+# Extra reward when operative tags for_clue "current" and picks a spymaster-listed intended word.
+INTENT_MATCH_BONUS = 0.08
+INTENT_MATCH_BONUS_CAP = 0.32
 
 
 class SpymasterAgent:
@@ -69,7 +75,7 @@ class SpymasterAgent:
     ) -> dict | None:
         model = load_model()
 
-        state = self._state_from_view(view, model)
+        state = self._state_from_view(view, model, attribution_context=None)
 
         raw_candidates = candidate_clues(
             view.team_words,
@@ -102,6 +108,7 @@ class SpymasterAgent:
         number: int,
         intended_team_words: list[str] | None = None,
         *,
+        attribution_context: np.ndarray | None = None,
         log_training: bool = False,
     ) -> bool:
         model = load_model()
@@ -117,7 +124,7 @@ class SpymasterAgent:
             if not intended:
                 intended = None
 
-        state = self._state_from_view(view, model)
+        state = self._state_from_view(view, model, attribution_context=attribution_context)
         clue_vec = model[key]
         num_for_action = max(1, min(9, len(intended))) if intended else max(1, min(9, number))
         action_vec = self._agent.build_action_vec(clue_vec, num_for_action)
@@ -144,6 +151,8 @@ class SpymasterAgent:
         next_view: SpymasterBoardView,
         done: bool,
         *,
+        next_attribution_context: np.ndarray | None = None,
+        operative_guesses: list[tuple[str, str, str]] | None = None,
         log_training: bool = False,
     ):
         if self._last_state is None or self._last_action_vec is None:
@@ -151,8 +160,18 @@ class SpymasterAgent:
 
         reward = sum(_OUTCOME_REWARD.get(o, 0.0) for o in outcomes)
 
+        if operative_guesses and self._last_covered:
+            intended = {w.upper() for w in self._last_covered}
+            extra = 0.0
+            for word, _outcome, fc in operative_guesses:
+                if fc == "current" and word.strip().upper() in intended:
+                    extra += INTENT_MATCH_BONUS
+            reward += min(extra, INTENT_MATCH_BONUS_CAP)
+
         model = load_model()
-        next_state = self._state_from_view(next_view, model)
+        next_state = self._state_from_view(
+            next_view, model, attribution_context=next_attribution_context
+        )
 
         if done:
             next_best_q = 0.0
@@ -198,12 +217,19 @@ class SpymasterAgent:
     def _embed_words(words: list[str], model) -> list[np.ndarray]:
         return [model[w.lower()] for w in words if w.lower() in model]
 
-    def _state_from_view(self, view: SpymasterBoardView, model) -> np.ndarray:
+    def _state_from_view(
+        self,
+        view: SpymasterBoardView,
+        model,
+        *,
+        attribution_context: np.ndarray | None = None,
+    ) -> np.ndarray:
         return self._agent.build_state(
             self._embed_words(view.team_words, model),
             self._embed_words(view.opponent_words, model),
             self._embed_words(view.neutral_words, model),
             self._embed_words(view.assassin_words, model),
+            attribution_vec=attribution_context,
         )
 
     @staticmethod

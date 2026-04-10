@@ -3,13 +3,13 @@ Q-learning agent for the Codenames AI spymaster.
 
 Architecture
 ------------
-State  : 400-dim vector — mean(team) + mean(opponent) + mean(neutral) + mean(assassin)
-         (100d each; empty groups use zeros so the net sees role structure.)
-Action : 101-dim vector  — clue word embedding (100d) + normalized number (1d)
-Input  : 501-dim         — state concatenated with action
-Output : scalar Q-value  — expected cumulative reward for (state, action)
+State  : 500-dim — 400d role means (team/opp/neutral/assassin) + 100d operative-attribution
+         (attribution = mean GloVe clue vec for guesses tagged with a clue; zeros if unknown.)
+Action : 101-dim — clue embedding (100d) + normalized number (1d)
+Input  : 601-dim — state concatenated with action
+Output : scalar Q-value
 
-Network: 501 → 128 → 64 → 1  (ReLU activations, Adam optimizer, pure numpy)
+Network: 601 → 128 → 64 → 1  (ReLU, Adam, pure numpy)
 
 Training loop (called from main_window after each human guess):
   1. agent.build_state(...)         → state vector
@@ -19,6 +19,8 @@ Training loop (called from main_window after each human guess):
   5. agent.train_step()             → one gradient update
   6. agent.decay_epsilon()          → reduce exploration over time
 """
+
+from __future__ import annotations
 
 import pickle
 from pathlib import Path
@@ -37,9 +39,11 @@ TARGET_UPDATE_FREQ = 100  # sync target network every N gradient steps
 
 # ── Dimensions ─────────────────────────────────────────────────────────────────
 EMBED_DIM = 100         # GloVe 100d
-STATE_DIM = EMBED_DIM * 4   # 400: team, opponent, neutral, assassin pools
+STATE_ROLE_DIM = EMBED_DIM * 4   # 400: team, opponent, neutral, assassin pools
+ATTRIBUTION_DIM = EMBED_DIM      # mean clue vec from operative for_clue tags
+STATE_DIM = STATE_ROLE_DIM + ATTRIBUTION_DIM  # 500
 ACTION_DIM = EMBED_DIM + 1  # 101: clue vec + normalized number
-INPUT_DIM = STATE_DIM + ACTION_DIM  # 501
+INPUT_DIM = STATE_DIM + ACTION_DIM  # 601
 
 # ── Rewards ────────────────────────────────────────────────────────────────────
 REWARD_CORRECT = 1.0
@@ -93,6 +97,54 @@ class ReplayBuffer:
 
     def __len__(self):
         return len(self._buf)
+
+    def pack_for_save(self) -> dict:
+        """Serialize buffer for pickle (survives process restarts)."""
+        transitions = []
+        for s, a, r, nq, d in self._buf:
+            transitions.append(
+                (
+                    np.asarray(s, dtype=np.float32),
+                    np.asarray(a, dtype=np.float32),
+                    float(r),
+                    float(nq),
+                    float(d),
+                )
+            )
+        return {
+            "capacity": self._capacity,
+            "idx": self._idx,
+            "transitions": transitions,
+        }
+
+    @classmethod
+    def unpack(cls, data: dict) -> ReplayBuffer:
+        cap = int(data.get("capacity", BUFFER_CAPACITY))
+        rb = ReplayBuffer(capacity=cap)
+        raw = data.get("transitions") or []
+        rb._buf = []
+        for t in raw:
+            if len(t) != 5:
+                continue
+            s, a, r, nq, d = t
+            rb._buf.append(
+                (
+                    np.asarray(s, dtype=np.float32),
+                    np.asarray(a, dtype=np.float32),
+                    float(r),
+                    float(nq),
+                    float(d),
+                )
+            )
+        if len(rb._buf) > cap:
+            rb._buf = rb._buf[-cap:]
+            rb._idx = int(data.get("idx", 0)) % max(cap, 1)
+        elif len(rb._buf) < cap:
+            # Partial buffer: next push always appends; idx must match logical length.
+            rb._idx = len(rb._buf)
+        else:
+            rb._idx = int(data.get("idx", 0)) % max(cap, 1)
+        return rb
 
 
 # ── Q-Network (pure numpy) ─────────────────────────────────────────────────────
@@ -226,9 +278,10 @@ class QLearningAgent:
         opponent_vecs: list[np.ndarray],
         neutral_vecs: list[np.ndarray],
         assassin_vecs: list[np.ndarray],
+        attribution_vec: np.ndarray | None = None,
     ) -> np.ndarray:
         """
-        Build a 400-dim state: mean embedding per role (unrevealed cards only).
+        Build state: 400d role means + 100d operative clue-attribution (or zeros).
         """
         def _mean(vecs: list[np.ndarray]) -> np.ndarray:
             return np.mean(vecs, axis=0) if vecs else np.zeros(EMBED_DIM)
@@ -239,7 +292,14 @@ class QLearningAgent:
             _mean(neutral_vecs),
             _mean(assassin_vecs),
         ]
-        return np.concatenate(parts).astype(np.float32)
+        base = np.concatenate(parts).astype(np.float32)
+        if attribution_vec is None:
+            attr = np.zeros(ATTRIBUTION_DIM, dtype=np.float32)
+        else:
+            attr = np.asarray(attribution_vec, dtype=np.float32).reshape(-1)
+            if attr.shape[0] != ATTRIBUTION_DIM:
+                attr = np.zeros(ATTRIBUTION_DIM, dtype=np.float32)
+        return np.concatenate([base, attr]).astype(np.float32)
 
     def build_action_vec(self, clue_vec: np.ndarray, number: int) -> np.ndarray:
         """Build a 101-dim action vector: clue embedding + normalized number."""
@@ -353,6 +413,7 @@ class QLearningAgent:
             "params": {k: getattr(self.q_net, k) for k in ("W1", "b1", "W2", "b2", "W3", "b3")},
             "epsilon": self.epsilon,
             "steps": self._steps,
+            "replay": self.buffer.pack_for_save(),
         }
         with open(path, "wb") as f:
             pickle.dump(data, f)
@@ -375,6 +436,13 @@ class QLearningAgent:
             setattr(self.q_net, k, v)
         self.epsilon = data["epsilon"]
         self._steps = data["steps"]
+        if isinstance(data.get("replay"), dict):
+            try:
+                self.buffer = ReplayBuffer.unpack(data["replay"])
+            except Exception:
+                self.buffer = ReplayBuffer()
+        else:
+            self.buffer = ReplayBuffer()
         self._sync_target()
-        print(f"[AI] Model loaded from {path}")
+        print(f"[AI] Model loaded from {path} (replay buffer: {len(self.buffer)} transitions)")
         return True
