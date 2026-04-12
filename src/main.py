@@ -10,12 +10,24 @@ from ui.main_window import MainWindow
 
 
 def main():
-    use_ai_agent_file = "ai-training" in sys.argv or "llm-training" in sys.argv
-    training_mode = "training" in sys.argv or use_ai_agent_file
+    # Load data/ai_agent.pkl (LLM self-play checkpoint) instead of data/agent.pkl.
+    use_ai_agent_file = (
+        "ai-training" in sys.argv
+        or "llm-training" in sys.argv
+        or "use-ai-agent" in sys.argv
+    )
+    # Training updates the checkpoint; "use-ai-agent" is play-only with that file.
+    training_mode = (
+        "training" in sys.argv
+        or "ai-training" in sys.argv
+        or "llm-training" in sys.argv
+    )
     app = QApplication(sys.argv)
     app.setApplicationName("Codenames")
     win = MainWindow(training_mode=training_mode, use_ai_agent_file=use_ai_agent_file)
     win.show()
+    if use_ai_agent_file and not training_mode:
+        print("[AI] Loaded Spymaster weights from data/ai_agent.pkl (play mode, no training).")
     if training_mode:
         ckpt = "data/ai_agent.pkl" if use_ai_agent_file else "data/agent.pkl"
         print("[AI] Training mode")
