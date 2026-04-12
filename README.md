@@ -54,6 +54,17 @@ From inside `src/`:
 cd src && python main.py
 ```
 
+## AI Training (LLM Self-Play)
+
+Run self-play training from the project root:
+
+```bash
+python -m src.llm_selfplay --games 1 -v
+```
+
+By default, training **saves to** `data/ai_agent.pkl`, and the game **loads from the same file** for the AI Suggest feature.  
+You can override the save path with `--checkpoint`.
+
 ## Rule Summary
 
 - **4 players**: Red Spymaster, Red Operative, Blue Spymaster, Blue Operative.
