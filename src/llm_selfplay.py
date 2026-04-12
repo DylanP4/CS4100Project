@@ -12,6 +12,7 @@ import argparse
 import random
 import sys
 import time
+from pathlib import Path
 
 from constants import BLUE, PHASE_OPERATIVE, PHASE_SPYMASTER, RED
 from game_engine import GameEngine
@@ -24,14 +25,45 @@ from ai.llm_providers import LLMProviderError
 from ai.llm_schemas import SchemaError, extract_json_object, parse_clue, parse_operative_turn
 
 SPYMASTER_SYSTEM = """Codenames spymaster. One-word clue not on the board (no substring-of-board-word tricks).
-JSON only, no markdown: {"clue":"<word>","number":<int>=1,"intended":["W",...]?}
-Optional "intended": your team's unrevealed words from the user message this clue is for. Use clear, everyday clues."""
+Return ONE JSON object only — no markdown, no extra text, no explanations.
+Use ONLY these keys: clue, number, intended. Do NOT include any other keys.
+Schema: {"clue":"<word>","number":<int>=1,"intended":["W",...]?}
+Clue must NOT match any board word (team/opp/neutral/assassin) and must be one word.
+If you include "intended", it MUST be copied EXACTLY from the TEAM list in the user message.
+Never invent, transform, or generalize intended words (e.g., DOCTOR, FIRE, RED, IRON, BEAR, LEMON, IVORY).
+If unsure, OMIT "intended" entirely.
+Use clear, everyday clues."""
 
-OPERATIVE_SYSTEM = """Codenames operative — no card colors. JSON only, no markdown.
-Guess: {"guess":"WORD","for_clue":"current"|1|2|...|"none"|"arbitrary"} — for_clue required (current=this clue; 1,2,...=past round index in history; none/arbitrary when not tied to a clue).
+OPERATIVE_SYSTEM = """Codenames operative — no card colors.
+Return ONE JSON object only — no markdown, no extra text, no explanations.
+Use ONLY these keys: guess, for_clue, pass. Do NOT include any other keys.
+Guess: {"guess":"WORD","for_clue":"current"|1|2|...|"none"|"arbitrary"} — for_clue required.
 Pass: {"pass":true} only when allowed after at least one guess.
+Guess MUST be copied EXACTLY from the UNREVEALED list in the user message.
+for_clue MUST be exactly: "current", "none", "arbitrary", or a number 1..N (no extra text).
 
 Rules: one unrevealed board word per guess; max (n+1) guesses for clue number n; don't use the extra guess without a strong reason. n ≈ how many words the clue targets; pick the best obvious fit (what spymaster likely meant), not a stretch if a clearer match exists."""
+
+FAILURE_LOG_PATH = Path(__file__).resolve().parent.parent / "data" / "llm_failures.log"
+
+
+def _log_llm_failure(role: str, err: str | None, raw: str | None) -> None:
+    if not raw and not err:
+        return
+    ts = time.strftime("%Y-%m-%d %H:%M:%S")
+    lines = [
+        f"[{ts}] role={role}",
+        f"error={err or '(none)'}",
+        "raw=",
+        raw or "",
+        "-" * 40,
+    ]
+    try:
+        FAILURE_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with FAILURE_LOG_PATH.open("a", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+    except OSError:
+        pass
 
 
 def _guess_parts(g) -> tuple[str, str, str]:
@@ -93,16 +125,19 @@ def run_spymaster_turn(
         ]
         if err:
             lines.append(f"Fix: {err}")
+            lines.append("Respond again with ONLY the corrected JSON object. No extra text.")
         return "\n".join(lines)
 
     clue: str | None = None
     number: int | None = None
     intended_list: list[str] | None = None
     last_err: str | None = None
+    last_raw: str | None = None
     for attempt in range(max_attempts):
         temp = 0.25 if attempt == 0 else 0.08
         try:
             raw = groq_complete(SPYMASTER_SYSTEM, user_msg(last_err), temperature=temp)
+            last_raw = raw
             obj = extract_json_object(raw)
             clue, number, intended_list = parse_clue(obj, board_set, team_set)
             break
@@ -112,6 +147,10 @@ def run_spymaster_turn(
             raise
     if clue is None or number is None:
         print(f"[llm_selfplay] spymaster gave up: {last_err}", file=sys.stderr)
+        if last_raw:
+            print("[llm_selfplay] spymaster last raw output:", file=sys.stderr)
+            print(last_raw, file=sys.stderr)
+        _log_llm_failure("spymaster", last_err, last_raw)
         return False, False
 
     ok, msg = engine.submit_clue(clue, number)
@@ -213,6 +252,7 @@ def run_operative_turn(
             return "\n".join(bits)
 
         last_err: str | None = None
+        last_raw: str | None = None
         word: str | None = None
         is_pass = False
         for_tag = "current"
@@ -230,6 +270,7 @@ def run_operative_turn(
                 ]
             try:
                 raw = groq_chat_messages(to_send, temperature=temp)
+                last_raw = raw
                 obj = extract_json_object(raw)
                 word, is_pass, for_tag = parse_operative_turn(
                     obj,
@@ -245,6 +286,10 @@ def run_operative_turn(
                 raise
         else:
             print(f"[llm_selfplay] operative stuck: {last_err}; forcing pass/end", file=sys.stderr)
+            if last_raw:
+                print("[llm_selfplay] operative last raw output:", file=sys.stderr)
+                print(last_raw, file=sys.stderr)
+            _log_llm_failure("operative", last_err, last_raw)
             if must_guess and unrevealed:
                 idx = random.randrange(len(unrevealed))
                 word = unrevealed[idx].upper()
@@ -392,10 +437,18 @@ def main() -> None:
 
     agent = SpymasterAgent(save_path=ckpt)
 
-    for g in range(args.games):
+    completed = 0
+    aborts = 0
+    attempts = 0
+    max_attempts = max(args.games * 3, args.games + 2)
+    while completed < args.games:
+        attempts += 1
+        if attempts > max_attempts:
+            print("[llm_selfplay] too many aborted games; stopping early", file=sys.stderr)
+            break
         if args.verbose:
-            print(f"\n[llm_selfplay] === game {g + 1}/{args.games} ===")
-        seed = args.seed + g if args.seed is not None else None
+            print(f"\n[llm_selfplay] === game {completed + 1}/{args.games} ===")
+        seed = args.seed + completed if args.seed is not None else None
         try:
             winner = play_one_game(agent, verbose=args.verbose, seed=seed)
         except LLMProviderError as e:
@@ -405,7 +458,15 @@ def main() -> None:
             sys.exit(2)
         if args.verbose:
             print(f"[llm_selfplay] winner={winner}")
+        if winner == "aborted_spymaster":
+            aborts += 1
+            print("[llm_selfplay] restarting with a fresh game after spymaster failure")
+            continue
+        completed += 1
 
+    if aborts:
+        print(f"[llm_selfplay] aborted games: {aborts}", file=sys.stderr)
+        print(f"[llm_selfplay] failure log: {FAILURE_LOG_PATH}", file=sys.stderr)
     print(f"[llm_selfplay] done; checkpoint {ckpt}")
 
 

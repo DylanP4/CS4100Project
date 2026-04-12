@@ -6,15 +6,29 @@ class SchemaError(ValueError):
     pass
 
 
+def _slice_first_json_object(raw: str) -> str | None:
+    start = raw.find("{")
+    if start == -1:
+        return None
+    depth = 0
+    for i in range(start, len(raw)):
+        ch = raw[i]
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return raw[start : i + 1]
+    return None
+
+
 def extract_json_object(text: str) -> dict:
     raw = text.strip()
     raw = re.sub(r"^\s*```(?:json)?\s*", "", raw, flags=re.IGNORECASE | re.DOTALL)
     raw = re.sub(r"\s*```\s*$", "", raw.strip())
-    start = raw.find("{")
-    end = raw.rfind("}")
-    if start == -1 or end <= start:
+    snippet = _slice_first_json_object(raw)
+    if snippet is None:
         raise SchemaError("no JSON object found in model output")
-    snippet = raw[start : end + 1]
     try:
         out = json.loads(snippet)
     except json.JSONDecodeError as e:
@@ -24,11 +38,28 @@ def extract_json_object(text: str) -> dict:
     return out
 
 
+def _check_extra_keys(obj: dict, allowed: set[str]) -> None:
+    extras = sorted(k for k in obj.keys() if k not in allowed)
+    if extras:
+        raise SchemaError(f"unexpected keys in JSON: {', '.join(extras)}")
+
+
 def parse_clue(
     obj: dict,
     board_words_upper: set[str],
     team_words_upper: set[str] | None = None,
 ) -> tuple[str, int, list[str] | None]:
+    _check_extra_keys(
+        obj,
+        {
+            "clue",
+            "word",
+            "number",
+            "intended",
+            "intended_targets",
+            "targets",
+        },
+    )
     clue = obj.get("clue") if "clue" in obj else obj.get("word")
     if clue is None:
         raise SchemaError('missing "clue" (one word, not on the board)')
@@ -111,6 +142,7 @@ def parse_operative_turn(
     Returns (word_upper, is_pass, for_clue_tag).
     for_clue_tag is "pass" on pass; else "current", "1".."N", "none", or "arbitrary".
     """
+    _check_extra_keys(obj, {"guess", "word", "for_clue", "pass", "action"})
     wants_pass = obj.get("pass") is True or str(obj.get("action", "")).lower() == "pass"
     if wants_pass:
         if must_guess:
