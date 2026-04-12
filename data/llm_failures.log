@@ -1,0 +1,276 @@
+[2026-04-10 19:15:51] role=spymaster
+error="intended" word 'DOCTOR' must be one of your team words on the board
+raw=
+{"clue":"Medical","number":1,"intended":["DOCTOR"]}
+----------------------------------------
+[2026-04-10 19:16:33] role=spymaster
+error="intended" word 'FIRE' must be one of your team words on the board
+raw=
+{"clue":"Flame", "number":1, "intended":["FIRE"]}
+----------------------------------------
+[2026-04-10 19:27:14] role=operative
+error=guess must be exactly one unrevealed board word; got 'SHIP'
+raw=
+{
+  "guess": "SHIP",
+  "for_clue": "none"
+}
+----------------------------------------
+[2026-04-10 19:28:51] role=spymaster
+error="intended" word 'RED' must be one of your team words on the board
+raw=
+{"clue":"fire","number":1,"intended":["RED"]}
+----------------------------------------
+[2026-04-10 19:31:31] role=operative
+error=guess must be exactly one unrevealed board word; got 'DROP'
+raw=
+{"guess":"DROP","for_clue":"current"}
+----------------------------------------
+[2026-04-10 19:32:21] role=operative
+error="for_clue": "current" | <past round 1..N> | "none" | "arbitrary"
+raw=
+{"guess":"BAR","for_clue":"1|left|true"}
+----------------------------------------
+[2026-04-10 19:41:35] role=spymaster
+error="intended" word 'BEAR' must be one of your team words on the board
+raw=
+{"clue":"Furry","number":1,"intended":["BEAR"]}
+----------------------------------------
+[2026-04-10 19:42:01] role=spymaster
+error="intended" word 'IRON' must be one of your team words on the board
+raw=
+{"clue":"metal","number":1,"intended":["IRON"]}
+----------------------------------------
+[2026-04-10 19:43:17] role=operative
+error="for_clue": "current" | <past round 1..N> | "none" | "arbitrary"
+raw=
+{"guess":"LIMOUSINE","for_clue":"VEHICLE|2|2|none"}
+----------------------------------------
+[2026-04-10 20:15:50] role=operative
+error=guess must be exactly one unrevealed board word; got 'SMUGGLER'
+raw=
+{
+  "guess": "SMUGGLER",
+  "for_clue": "current"
+}
+----------------------------------------
+[2026-04-10 20:21:59] role=spymaster
+error="intended" word 'LEMON' must be one of your team words on the board
+raw=
+{"clue":"fruit","number":1,"intended":["LEMON"]}
+----------------------------------------
+[2026-04-10 20:29:16] role=spymaster
+error=clue cannot match any word on the board
+raw=
+{"clue":"Knight", "number":1, "intended":["KNIGHT"]}
+----------------------------------------
+[2026-04-11 13:27:57] role=operative
+error=guess must be exactly one unrevealed board word; got 'CAR'
+raw=
+{
+  "guess": "CAR", 
+  "for_clue": "current"
+}
+----------------------------------------
+[2026-04-11 13:43:16] role=operative
+error=guess must be exactly one unrevealed board word; got 'LIMOUSINE'
+raw=
+{
+  "guess": "LIMOUSINE",
+  "for_clue": "none"
+}
+----------------------------------------
+[2026-04-11 13:44:30] role=operative
+error="for_clue": "current" | <past round 1..N> | "none" | "arbitrary"
+raw=
+{"guess":"WHIP","for_clue":"n=1|left=2|must_guess=True"}
+----------------------------------------
+[2026-04-11 13:50:06] role=operative
+error=guess must be exactly one unrevealed board word; got 'GAME'
+raw=
+{"guess":"GAME","for_clue":"current"}
+----------------------------------------
+[2026-04-11 13:50:45] role=operative
+error=guess must be exactly one unrevealed board word; got 'CAR'
+raw=
+{
+  "guess": "CAR", 
+  "for_clue": "current"
+}
+----------------------------------------
+[2026-04-11 13:51:20] role=spymaster
+error="intended" word 'LEAD' must be one of your team words on the board
+raw=
+{"clue":"metal","number":1,"intended":["LEAD"]}
+----------------------------------------
+[2026-04-11 13:54:55] role=spymaster
+error="intended" word 'IVORY' must be one of your team words on the board
+raw=
+{"clue":"white","number":1,"intended":["IVORY"]}
+----------------------------------------
+[2026-04-11 13:56:54] role=operative
+error=guess must be exactly one unrevealed board word; got 'ROCK'
+raw=
+{
+  "guess": "ROCK",
+  "for_clue": "none"
+}
+----------------------------------------
+[2026-04-11 13:58:44] role=operative
+error=guess must be exactly one unrevealed board word; got 'GUN'
+raw=
+{"guess":"GUN","for_clue":"current"}
+----------------------------------------
+[2026-04-11 14:05:19] role=operative
+error="for_clue" round index must be 1..0, got 1
+raw=
+{"guess":"ROBOT","for_clue":"1"}
+----------------------------------------
+[2026-04-11 14:05:39] role=operative
+error="for_clue" round index must be 1..0, got 1
+raw=
+{"guess":"ROBOT","for_clue":"1"}
+----------------------------------------
+[2026-04-11 14:06:33] role=operative
+error=guess must be exactly one unrevealed board word; got 'SHIP'
+raw=
+{"guess":"SHIP","for_clue":"current"}
+----------------------------------------
+[2026-04-11 14:07:55] role=operative
+error=guess must be exactly one unrevealed board word; got 'TELEPHONE'
+raw=
+{"guess":"TELEPHONE","for_clue":"none"}
+----------------------------------------
+[2026-04-11 14:11:19] role=operative
+error="for_clue" round index must be 1..0, got 1
+raw=
+{"guess":"MAPLE","for_clue":"1"}
+----------------------------------------
+[2026-04-11 14:11:54] role=operative
+error="for_clue" round index must be 1..0, got 1
+raw=
+{"guess":"FOREST","for_clue":"1"}
+----------------------------------------
+[2026-04-11 14:18:24] role=operative
+error=guess must be exactly one unrevealed board word; got 'DOCTOR'
+raw=
+{
+  "guess": "DOCTOR",
+  "for_clue": "none"
+}
+----------------------------------------
+[2026-04-11 14:22:23] role=operative
+error=guess must be exactly one unrevealed board word; got 'WIND'
+raw=
+{"guess":"WIND","for_clue":"current"}
+----------------------------------------
+[2026-04-11 14:27:38] role=spymaster
+error="intended" word 'BLUE' must be one of your team words on the board
+raw=
+{"clue":"cloud","number":1,"intended":["BLUE"]}
+----------------------------------------
+[2026-04-11 15:12:34] role=operative
+error=guess must be exactly one unrevealed board word; got 'BLOCK'
+raw=
+{"guess":"BLOCK","for_clue":"none"}
+----------------------------------------
+[2026-04-11 15:13:26] role=operative
+error=guess must be exactly one unrevealed board word; got 'BLOCK'
+raw=
+{"guess":"BLOCK","for_clue":"none"}
+----------------------------------------
+[2026-04-11 15:14:26] role=operative
+error=guess must be exactly one unrevealed board word; got 'PIE'
+raw=
+{"guess":"PIE","for_clue":"1"}
+----------------------------------------
+[2026-04-11 15:19:01] role=spymaster
+error="intended" word 'BLUE' must be one of your team words on the board
+raw=
+{"clue":"cloud","number":1,"intended":["BLUE"]}
+----------------------------------------
+[2026-04-11 15:20:09] role=operative
+error="for_clue" round index must be 1..0, got 1
+raw=
+{"guess":"ROBOT","for_clue":"1"}
+----------------------------------------
+[2026-04-11 15:20:50] role=operative
+error="for_clue" round index must be 1..0, got 1
+raw=
+{"guess":"ROBOT","for_clue":"1"}
+----------------------------------------
+[2026-04-11 15:25:36] role=operative
+error=guess must be exactly one unrevealed board word; got 'MAIL'
+raw=
+{"guess":"MAIL","for_clue":"current"}
+----------------------------------------
+[2026-04-11 15:28:10] role=operative
+error="for_clue" round index must be 1..0, got 1
+raw=
+{"guess":"ROBOT","for_clue":"1"}
+----------------------------------------
+[2026-04-11 15:28:52] role=operative
+error="for_clue" round index must be 1..0, got 1
+raw=
+{"guess":"TABLET","for_clue":"1"}
+----------------------------------------
+[2026-04-11 15:34:42] role=operative
+error=guess must be exactly one unrevealed board word; got 'COMPUTER'
+raw=
+{"guess":"COMPUTER","for_clue":"1"}
+----------------------------------------
+[2026-04-11 15:35:13] role=operative
+error="for_clue" round index must be 1..0, got 1
+raw=
+{"guess":"SATURN","for_clue":"1"}
+----------------------------------------
+[2026-04-11 15:37:41] role=operative
+error="for_clue" round index must be 1..0, got 1
+raw=
+{"guess":"TELESCOPE","for_clue":"1"}
+----------------------------------------
+[2026-04-11 15:42:52] role=operative
+error="for_clue" round index must be 1..0, got 1
+raw=
+{"guess":"ROBOT","for_clue":"1"}
+----------------------------------------
+[2026-04-11 15:50:59] role=operative
+error="for_clue" round index must be 1..0, got 1
+raw=
+{"guess":"CELL","for_clue":"1"}
+----------------------------------------
+[2026-04-11 15:51:31] role=operative
+error="for_clue" round index must be 1..0, got 1
+raw=
+{"guess":"CELL","for_clue":"1"}
+----------------------------------------
+[2026-04-11 17:38:24] role=operative
+error=guess must be exactly one unrevealed board word; got 'CAR'
+raw=
+{"guess":"CAR","for_clue":"current"}
+----------------------------------------
+[2026-04-11 18:09:57] role=operative
+error=guess must be exactly one unrevealed board word; got 'PLANE'
+raw=
+{"guess":"PLANE","for_clue":"none"}
+----------------------------------------
+[2026-04-11 18:31:33] role=operative
+error=guess must be exactly one unrevealed board word; got 'PLANE'
+raw=
+{"guess":"PLANE","for_clue":"none"}
+----------------------------------------
+[2026-04-11 20:09:30] role=operative
+error="for_clue" round index must be 1..0, got 1
+raw=
+{"guess":"COMPOUND","for_clue":"1"}
+----------------------------------------
+[2026-04-11 22:00:39] role=operative
+error="for_clue" round index must be 1..0, got 1
+raw=
+{"guess":"COMPOUND","for_clue":"1"}
+----------------------------------------
+[2026-04-11 22:00:58] role=operative
+error="for_clue" round index must be 1..0, got 1
+raw=
+{"guess":"COMPOUND","for_clue":"1"}
+----------------------------------------
