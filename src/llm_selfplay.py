@@ -28,6 +28,8 @@ SPYMASTER_SYSTEM = """Codenames spymaster. One-word clue not on the board (no su
 Return ONE JSON object only — no markdown, no extra text, no explanations.
 Use ONLY these keys: clue, number, intended. Do NOT include any other keys.
 Schema: {"clue":"<word>","number":<int>=1,"intended":["W",...]?}
+Prefer small numbers: aim for number=1 most of the time; number=2 only when very strong.
+Avoid number>=3 unless absolutely obvious and safe.
 Clue must NOT match any board word (team/opp/neutral/assassin) and must be one word.
 If you include "intended", it MUST be copied EXACTLY from the TEAM list in the user message.
 Never invent, transform, or generalize intended words (e.g., DOCTOR, FIRE, RED, IRON, BEAR, LEMON, IVORY).
