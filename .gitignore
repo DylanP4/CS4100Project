@@ -7,4 +7,3 @@ venv311/
 CLAUDE.md
 ai_notes.txt
 .env
-data/*.pkl
