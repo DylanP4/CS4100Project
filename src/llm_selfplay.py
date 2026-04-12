@@ -28,8 +28,9 @@ SPYMASTER_SYSTEM = """Codenames spymaster. One-word clue not on the board (no su
 Return ONE JSON object only — no markdown, no extra text, no explanations.
 Use ONLY these keys: clue, number, intended. Do NOT include any other keys.
 Schema: {"clue":"<word>","number":<int>=1,"intended":["W",...]?}
-Prefer small numbers: aim for number=1 most of the time; number=2 only when very strong.
-Avoid number>=3 unless absolutely obvious and safe.
+We are maximizing strong single-word associations: use number=1 by default.
+Only use number=2 when the clue very clearly connects two team words.
+Never use number>=3.
 Clue must NOT match any board word (team/opp/neutral/assassin) and must be one word.
 If you include "intended", it MUST be copied EXACTLY from the TEAM list in the user message.
 Never invent, transform, or generalize intended words (e.g., DOCTOR, FIRE, RED, IRON, BEAR, LEMON, IVORY).
@@ -142,6 +143,13 @@ def run_spymaster_turn(
             last_raw = raw
             obj = extract_json_object(raw)
             clue, number, intended_list = parse_clue(obj, board_set, team_set)
+            if number > 2:
+                if verbose:
+                    print(
+                        f"[llm_selfplay] spymaster number clamped {number} -> 2",
+                        file=sys.stderr,
+                    )
+                number = 2
             break
         except (SchemaError, ValueError) as e:
             last_err = str(e)
