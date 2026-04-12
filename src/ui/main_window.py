@@ -56,6 +56,8 @@ class MainWindow(QMainWindow):
         self._ai_team: str = RED
         # Outcomes collected during the operative phase (e.g. ["correct", "neutral"]).
         self._turn_outcomes: list[str] = []
+        # Tracks engine.phase across refreshes so we only auto-switch board view on phase change.
+        self._last_ui_phase: str | None = None
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -84,6 +86,11 @@ class MainWindow(QMainWindow):
         self._loader.finished.connect(self._on_model_ready)
         self._loader.failed.connect(self._on_model_failed)
         self._loader.start()
+
+    def _apply_spymaster_view(self, on: bool) -> None:
+        """Keep toolbar checkbox and board key colors in sync (used for auto phase switching)."""
+        self._toolbar.set_spymaster_checked(on)
+        self._game_view.board.set_spymaster_view(on)
 
     # ── Game flow ──────────────────────────────────────────────────────────────
 
@@ -287,6 +294,7 @@ class MainWindow(QMainWindow):
         clue_stack = view.clue_stack
 
         if engine.board is None:
+            self._last_ui_phase = None
             status.update_state(RED, PHASE_SPYMASTER, 0, 0)
             board_widget.load_board([], [], [])
             board_widget.set_operative_guessing(False)
@@ -305,6 +313,7 @@ class MainWindow(QMainWindow):
         )
 
         if engine.game_over:
+            self._last_ui_phase = None
             board_widget.set_operative_guessing(False)
             clue_stack.show_spymaster()
             clue_stack.configure_training_spymaster(False, [])
@@ -325,5 +334,13 @@ class MainWindow(QMainWindow):
             clue_stack.show_operative()
             clue_stack.update_guess_panel(engine.clue_word, engine.guesses_left)
             board_widget.set_operative_guessing(engine.guesses_left > 0)
+
+        ph = engine.phase
+        if ph != self._last_ui_phase:
+            if ph == PHASE_SPYMASTER:
+                self._apply_spymaster_view(True)
+            elif ph == PHASE_OPERATIVE:
+                self._apply_spymaster_view(False)
+            self._last_ui_phase = ph
 
         self._toolbar.set_start_enabled(False)

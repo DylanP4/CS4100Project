@@ -31,6 +31,12 @@ class Toolbar(QWidget):
         self._spymaster_check.toggled.connect(self.spymaster_toggled.emit)
         layout.addWidget(self._spymaster_check)
 
+    def set_spymaster_checked(self, on: bool) -> None:
+        """Sync the checkbox without emitting toggled (caller updates the board)."""
+        self._spymaster_check.blockSignals(True)
+        self._spymaster_check.setChecked(on)
+        self._spymaster_check.blockSignals(False)
+
     def set_start_enabled(self, enabled: bool) -> None:
         self._start_btn.setEnabled(enabled)
         self._end_btn.setEnabled(not enabled)
