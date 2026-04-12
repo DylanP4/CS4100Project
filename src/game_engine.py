@@ -143,6 +143,8 @@ class GameEngine:
                 self._game_over = True
                 self._winner = self._current_team
             self._emit()
+            if self._guesses_left <= 0 and not self._game_over:
+                self._end_turn()
             return True, "correct", "Correct!"
 
         if card_type == NEUTRAL:
