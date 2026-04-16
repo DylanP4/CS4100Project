@@ -9,7 +9,7 @@ param(
   [string]$FailureLog = "data\\llm_failures_experiment.log",
 
   [Parameter(Mandatory = $false)]
-  [switch]$Verbose
+  [switch]$PyVerbose
 )
 
 $ErrorActionPreference = "Stop"
@@ -22,6 +22,6 @@ $env:CODENAMES_AI_AGENT_PKL = $Checkpoint
 $env:CODENAMES_LLM_FAILURE_LOG = $FailureLog
 
 $v = @()
-if ($Verbose) { $v = @("-v") }
+if ($PyVerbose) { $v = @("-v") }
 
 python -m src.llm_selfplay --games $Games @v --checkpoint $Checkpoint --failure-log $FailureLog
