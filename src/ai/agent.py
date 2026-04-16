@@ -11,6 +11,7 @@ After the human operative finishes guessing:
 """
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 
 import numpy as np
@@ -26,9 +27,24 @@ from ai.Q_learning import (
     QLearningAgent,
 )
 
-DEFAULT_SAVE_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "agent.pkl"
-# Optional second Q-learning checkpoint (e.g. alternate data source); never overwrites agent.pkl.
-AI_AGENT_SAVE_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "ai_agent.pkl"
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+
+# Legacy/default checkpoint (older experiments).
+DEFAULT_SAVE_PATH = _REPO_ROOT / "data" / "agent.pkl"
+
+# Primary checkpoint used by UI + llm_selfplay. Can be overridden with an env var so
+# training runs can write to a separate .pkl without code changes.
+AI_AGENT_ENV_VAR = "CODENAMES_AI_AGENT_PKL"
+
+
+def _resolve_ai_agent_save_path() -> Path:
+    raw = (os.environ.get(AI_AGENT_ENV_VAR) or "").strip()
+    if raw:
+        return Path(raw)
+    return _REPO_ROOT / "data" / "ai_agent.pkl"
+
+
+AI_AGENT_SAVE_PATH = _resolve_ai_agent_save_path()
 
 
 @dataclass(frozen=True)

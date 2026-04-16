@@ -33,7 +33,7 @@ class _ModelLoader(QThread):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, training_mode: bool = False, use_ai_agent_file: bool = False):
+    def __init__(self, training_mode: bool = False, use_ai_agent_file: bool = True):
         super().__init__()
         self._training_mode = training_mode
         title = "Codenames — TRAINING MODE" if training_mode else "Codenames"

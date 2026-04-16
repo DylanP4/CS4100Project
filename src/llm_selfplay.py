@@ -9,6 +9,7 @@ Trains the existing Q-learning spymaster into data/ai_agent.pkl (or --checkpoint
 from __future__ import annotations
 
 import argparse
+import os
 import random
 import sys
 import time
@@ -47,7 +48,11 @@ for_clue MUST be exactly: "current", "none", "arbitrary", or a number 1..N (no e
 
 Rules: one unrevealed board word per guess; max (n+1) guesses for clue number n; don't use the extra guess without a strong reason. n ≈ how many words the clue targets; pick the best obvious fit (what spymaster likely meant), not a stretch if a clearer match exists."""
 
-FAILURE_LOG_PATH = Path(__file__).resolve().parent.parent / "data" / "llm_failures.log"
+FAILURE_LOG_ENV_VAR = "CODENAMES_LLM_FAILURE_LOG"
+_DEFAULT_FAILURE_LOG_PATH = Path(__file__).resolve().parent.parent / "data" / "llm_failures.log"
+FAILURE_LOG_PATH = Path(
+    (os.environ.get(FAILURE_LOG_ENV_VAR) or "").strip() or _DEFAULT_FAILURE_LOG_PATH
+)
 
 
 def _log_llm_failure(role: str, err: str | None, raw: str | None) -> None:
@@ -150,6 +155,15 @@ def run_spymaster_turn(
                         file=sys.stderr,
                     )
                 number = 2
+            if number == 2 and (not intended_list or len(intended_list) < 2):
+                # Strong bias toward single-target clues; allow 2 only when the model
+                # can explicitly name two team targets via "intended".
+                if verbose:
+                    print(
+                        "[llm_selfplay] spymaster number softened 2 -> 1 (no 2-word intended list)",
+                        file=sys.stderr,
+                    )
+                number = 1
             break
         except (SchemaError, ValueError) as e:
             last_err = str(e)
@@ -426,6 +440,12 @@ def main() -> None:
         default=str(AI_AGENT_SAVE_PATH),
         help="path for SpymasterAgent pickle",
     )
+    p.add_argument(
+        "--failure-log",
+        type=str,
+        default=str(FAILURE_LOG_PATH),
+        help=f"path for LLM failure log (default via {FAILURE_LOG_ENV_VAR})",
+    )
     p.add_argument("-v", "--verbose", action="store_true")
     p.add_argument("--seed", type=int, default=None)
     args = p.parse_args()
@@ -436,6 +456,9 @@ def main() -> None:
     require_groq()
 
     from pathlib import Path
+
+    global FAILURE_LOG_PATH
+    FAILURE_LOG_PATH = Path(args.failure_log)
 
     ckpt = Path(args.checkpoint)
     if args.verbose:
