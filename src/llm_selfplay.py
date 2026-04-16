@@ -8,12 +8,17 @@ Trains the existing Q-learning spymaster into data/ai_agent.pkl (or --checkpoint
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+_src_dir = Path(__file__).resolve().parent
+if str(_src_dir) not in sys.path:
+    sys.path.insert(0, str(_src_dir))
+
 import argparse
 import os
 import random
-import sys
 import time
-from pathlib import Path
 
 from constants import BLUE, PHASE_OPERATIVE, PHASE_SPYMASTER, RED
 from game_engine import GameEngine
@@ -432,6 +437,7 @@ def play_one_game(
 
 
 def main() -> None:
+    global FAILURE_LOG_PATH
     p = argparse.ArgumentParser(description="Groq LLM self-play + Q-learning (ai_agent.pkl)")
     p.add_argument("--games", type=int, default=1, help="full games to play")
     p.add_argument(
@@ -455,9 +461,6 @@ def main() -> None:
         sys.exit(1)
     require_groq()
 
-    from pathlib import Path
-
-    global FAILURE_LOG_PATH
     FAILURE_LOG_PATH = Path(args.failure_log)
 
     ckpt = Path(args.checkpoint)
