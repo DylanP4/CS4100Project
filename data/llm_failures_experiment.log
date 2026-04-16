@@ -1,0 +1,21 @@
+
+[2026-04-16 18:18:18] role=operative
+error=guess must be exactly one unrevealed board word; got 'CAR'
+raw=
+{"guess":"CAR","for_clue":"current"}
+----------------------------------------
+[2026-04-16 18:19:40] role=operative
+error=guess must be exactly one unrevealed board word; got 'CAR'
+raw=
+{"guess":"CAR","for_clue":"current"}
+----------------------------------------
+[2026-04-16 18:21:25] role=spymaster
+error="intended" word 'ARTIST' must be one of your team words on the board
+raw=
+{"clue":"painter","number":1,"intended":["ARTIST"]}
+----------------------------------------
+[2026-04-16 18:22:13] role=operative
+error="for_clue" round index must be 1..0, got 1
+raw=
+{"guess":"ROULETTE","for_clue":"1"}
+----------------------------------------
