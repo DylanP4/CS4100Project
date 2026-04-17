@@ -85,6 +85,11 @@ class SpymasterAgent:
         if save_path.exists():
             self._agent.load(save_path)
 
+    def reset_replay_checkpoint(self) -> None:
+        """Empty replay, reset Q-net Adam moments, resync target net, write checkpoint (keeps weights)."""
+        self._agent.clear_replay_buffer()
+        self._agent.save(self._save_path)
+
     def suggest(
         self,
         view: SpymasterBoardView,

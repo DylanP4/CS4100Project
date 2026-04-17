@@ -34,10 +34,10 @@ GROQ_MODEL = (os.environ.get("GROQ_MODEL") or "llama-3.1-8b-instant").strip()
 GEMINI_MODEL = (os.environ.get("GEMINI_MODEL") or "gemini-2.0-flash").strip()
 
 # Minimum seconds between Groq HTTP calls (end of one response → start of next). 0 = off.
-# For a 30 RPM cap, use ~2.05 (60/30 with small headroom). See also GROQ_PACE_RPM.
+# If set > 0, it wins over GROQ_PACE_RPM.
 GROQ_MIN_INTERVAL_SECONDS = max(0.0, _env_float("GROQ_MIN_INTERVAL_SECONDS", 0.0))
-# If GROQ_MIN_INTERVAL_SECONDS is 0 and this is > 0, interval = 60/GROQ_PACE_RPM * 1.05
-GROQ_PACE_RPM = max(0.0, _env_float("GROQ_PACE_RPM", 0.0))
+# Default ~25 RPM (~2.5s between calls) to reduce 429s on free tier. Set GROQ_PACE_RPM=0 to disable pacing.
+GROQ_PACE_RPM = max(0.0, _env_float("GROQ_PACE_RPM", 25.0))
 
 
 def groq_effective_min_interval_s() -> float:

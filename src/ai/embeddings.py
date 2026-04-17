@@ -14,6 +14,7 @@ from collections import defaultdict
 
 import numpy as np
 
+from constants import MAX_CLUE_TARGETS
 from ai.clue_lexicon import is_allowed_clue_lexeme
 from gensim import downloader as api
 from gensim.models import KeyedVectors
@@ -50,10 +51,8 @@ EXTRA_TARGET_BREADTH_BIAS = 0.4
 
 # Pool of team words linked to a clue (by similarity); Q-learning picks how many to use.
 MAX_STRONG_TEAM_LINKS = 12
-# How many distinct clue words to expand (each becomes up to MAX_TARGET_COUNT actions).
+# How many distinct clue words to expand (each becomes up to MAX_CLUE_TARGETS actions).
 MAX_CLUE_ROOTS = 22
-# Only k=1..3 targets per clue are offered to Q-learning (tight Codenames play).
-MAX_TARGET_COUNT = 3
 
 # Extra similarity to assassin / opponent / neutral hurts more than a flat "avoid" pool.
 ASSASSIN_PENALTY_WEIGHT = 5.0
@@ -92,7 +91,7 @@ def candidate_clues(
     cards for this clue-giver's team so penalties match real risk (assassin weighted
     highest, then opponent, then neutral).
 
-    For each clue word, up to three actions: k=1, 2, 3 team targets (prefix of the
+    For each clue word, up to MAX_CLUE_TARGETS actions: k=1..MAX_CLUE_TARGETS team targets (prefix of the
     similarity-sorted pool). Q-learning picks the clue and k. Cosine similarity only
     builds the pool and heuristic scores, not k beyond that cap.
     """
@@ -150,7 +149,7 @@ def candidate_clues(
             )
         )
 
-        max_k = min(len(pool), MAX_TARGET_COUNT)
+        max_k = min(len(pool), MAX_CLUE_TARGETS)
         for k in range(1, max_k + 1):
             picked = pool[:k]
             covered = [team_display.get(w, w) for w, _ in picked]

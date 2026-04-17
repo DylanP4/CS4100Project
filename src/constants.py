@@ -21,3 +21,6 @@ ASSASSIN_COUNT = 1
 
 PHASE_SPYMASTER = "spymaster"
 PHASE_OPERATIVE = "operative"
+
+# Spymaster: max team words targeted by one clue (LLM JSON + embedding candidates + Q-actions).
+MAX_CLUE_TARGETS = 3

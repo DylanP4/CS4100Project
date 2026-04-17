@@ -37,6 +37,11 @@ BATCH_SIZE = 32
 BUFFER_CAPACITY = 10_000
 TARGET_UPDATE_FREQ = 100  # sync target network every N gradient steps
 
+# Stabilize pure-numpy Adam + MSE (LLM self-play can produce extreme TD targets / bad batches).
+TARGET_Q_CLIP = 35.0    # clip Bellman targets before backprop
+GRAD_CLIP = 8.0         # clip each gradient element before Adam
+PARAM_CLIP = 80.0       # clip weights/biases after each update (also repairs bad checkpoints)
+
 # ── Dimensions ─────────────────────────────────────────────────────────────────
 EMBED_DIM = 100         # GloVe 100d
 STATE_ROLE_DIM = EMBED_DIM * 4   # 400: team, opponent, neutral, assassin pools
@@ -179,6 +184,12 @@ class QNetwork:
             "W3": self.W3, "b3": self.b3,
         }
 
+    def reset_optimizer_state(self) -> None:
+        """Clear Adam moments (e.g. after loading weights) so stale m/v cannot blow up the first step."""
+        self._t = 0
+        self._m = {k: np.zeros_like(v) for k, v in self._params().items()}
+        self._v = {k: np.zeros_like(v) for k, v in self._params().items()}
+
     # ── Forward pass ──────────────────────────────────────────────────────────
 
     def forward(self, x: np.ndarray) -> np.ndarray | float:
@@ -190,11 +201,27 @@ class QNetwork:
         if squeeze:
             x = x[np.newaxis, :]  # (1, INPUT_DIM)
 
-        z1 = x @ self.W1 + self.b1          # (batch, 128)
-        a1 = np.maximum(0, z1)              # ReLU
-        z2 = a1 @ self.W2 + self.b2         # (batch, 64)
-        a2 = np.maximum(0, z2)              # ReLU
-        q = a2 @ self.W3 + self.b3          # (batch, 1)
+        for p in self._params().values():
+            if not np.isfinite(p).all():
+                self._clip_params()
+                break
+
+        x = np.asarray(x, dtype=np.float32)
+        if not np.isfinite(x).all():
+            x = np.nan_to_num(x, nan=0.0, posinf=0.0, neginf=0.0)
+
+        # float32 matmul can overflow / warn on macOS BLAS; accumulate in float64, cache float32.
+        xd, W1d, b1d = x.astype(np.float64), self.W1.astype(np.float64), self.b1.astype(np.float64)
+        z1 = (xd @ W1d + b1d).astype(np.float32)
+        z1 = np.nan_to_num(z1, nan=0.0, posinf=1e6, neginf=-1e6)
+        a1 = np.maximum(0.0, z1).astype(np.float32)
+        a1d, W2d, b2d = a1.astype(np.float64), self.W2.astype(np.float64), self.b2.astype(np.float64)
+        z2 = (a1d @ W2d + b2d).astype(np.float32)
+        z2 = np.nan_to_num(z2, nan=0.0, posinf=1e6, neginf=-1e6)
+        a2 = np.maximum(0.0, z2).astype(np.float32)
+        a2d, W3d, b3d = a2.astype(np.float64), self.W3.astype(np.float64), self.b3.astype(np.float64)
+        q = (a2d @ W3d + b3d).astype(np.float32)
+        q = np.nan_to_num(q, nan=0.0, posinf=1e6, neginf=-1e6)
 
         self._cache = {"x": x, "z1": z1, "a1": a1, "z2": z2, "a2": a2}
         return float(q[0, 0]) if squeeze else q
@@ -208,28 +235,51 @@ class QNetwork:
         """
         c = self._cache
         batch = c["x"].shape[0]
+        for k in ("x", "z1", "a1", "z2", "a2"):
+            c[k] = np.nan_to_num(np.asarray(c[k], dtype=np.float32), nan=0.0, posinf=0.0, neginf=0.0)
 
-        q = c["a2"] @ self.W3 + self.b3     # recompute output (batch, 1)
-        d_q = 2 * (q - targets) / batch     # MSE gradient
+        a2d, W3d, b3d = c["a2"].astype(np.float64), self.W3.astype(np.float64), self.b3.astype(np.float64)
+        q = (a2d @ W3d + b3d).astype(np.float32)  # recompute output (batch, 1)
+        q = np.nan_to_num(q, nan=0.0, posinf=1e6, neginf=-1e6)
+        targets_f = np.asarray(targets, dtype=np.float32)
+        d_q = np.nan_to_num(2 * (q - targets_f) / batch, nan=0.0, posinf=0.0, neginf=0.0)
+        d_qd = d_q.astype(np.float64)
 
-        # Layer 3 gradients
-        dW3 = c["a2"].T @ d_q               # (64, 1)
+        # Layer 3 gradients (float64 matmul → float32 grads)
+        dW3 = (a2d.T @ d_qd).astype(np.float32)               # (64, 1)
         db3 = d_q.sum(axis=0)               # (1,)
 
         # Layer 2 gradients
-        d_a2 = d_q @ self.W3.T              # (batch, 64)
-        d_z2 = d_a2 * (c["z2"] > 0)        # ReLU gradient
-        dW2 = c["a1"].T @ d_z2             # (128, 64)
+        W3d = self.W3.astype(np.float64)
+        d_a2 = (d_qd @ W3d.T).astype(np.float32)              # (batch, 64)
+        d_z2 = (d_a2 * (c["z2"] > 0)).astype(np.float32)      # ReLU gradient
+        d_z2d = d_z2.astype(np.float64)
+        a1d = c["a1"].astype(np.float64)
+        dW2 = (a1d.T @ d_z2d).astype(np.float32)             # (128, 64)
         db2 = d_z2.sum(axis=0)             # (64,)
 
         # Layer 1 gradients
-        d_a1 = d_z2 @ self.W2.T            # (batch, 128)
-        d_z1 = d_a1 * (c["z1"] > 0)        # ReLU gradient
-        dW1 = c["x"].T @ d_z1             # (INPUT_DIM, 128)
+        W2d = self.W2.astype(np.float64)
+        d_a1 = (d_z2d @ W2d.T).astype(np.float32)            # (batch, 128)
+        d_z1 = (d_a1 * (c["z1"] > 0)).astype(np.float32)      # ReLU gradient
+        xd = c["x"].astype(np.float64)
+        d_z1d = d_z1.astype(np.float64)
+        dW1 = (xd.T @ d_z1d).astype(np.float32)             # (INPUT_DIM, 128)
         db1 = d_z1.sum(axis=0)            # (128,)
 
         grads = {"W1": dW1, "b1": db1, "W2": dW2, "b2": db2, "W3": dW3, "b3": db3}
+        for key, g in grads.items():
+            g = np.nan_to_num(g, nan=0.0, posinf=0.0, neginf=0.0)
+            grads[key] = np.clip(g, -GRAD_CLIP, GRAD_CLIP)
         self._adam_update(grads, lr)
+
+    def _clip_params(self) -> None:
+        for p in self._params().values():
+            p[:] = np.clip(
+                np.nan_to_num(p, nan=0.0, posinf=0.0, neginf=0.0),
+                -PARAM_CLIP,
+                PARAM_CLIP,
+            )
 
     def _adam_update(self, grads: dict, lr: float):
         self._t += 1
@@ -240,6 +290,7 @@ class QNetwork:
             m_hat = self._m[key] / (1 - self._beta1 ** self._t)
             v_hat = self._v[key] / (1 - self._beta2 ** self._t)
             params[key] -= lr * m_hat / (np.sqrt(v_hat) + self._eps_adam)
+        self._clip_params()
 
 
 # ── Q-Learning Agent ───────────────────────────────────────────────────────────
@@ -365,6 +416,12 @@ class QLearningAgent:
 
     # ── Training ───────────────────────────────────────────────────────────────
 
+    def clear_replay_buffer(self) -> None:
+        """Drop all replay transitions; reset Q-net Adam and resync target (weights unchanged)."""
+        self.buffer = ReplayBuffer()
+        self.q_net.reset_optimizer_state()
+        self._sync_target()
+
     def store_transition(
         self,
         state: np.ndarray,
@@ -373,7 +430,14 @@ class QLearningAgent:
         next_best_q: float,
         done: bool,
     ):
-        self.buffer.push(state, action_vec, reward, next_best_q, done)
+        nq = float(
+            np.clip(
+                np.nan_to_num(next_best_q, nan=0.0, posinf=TARGET_Q_CLIP, neginf=-TARGET_Q_CLIP),
+                -TARGET_Q_CLIP,
+                TARGET_Q_CLIP,
+            )
+        )
+        self.buffer.push(state, action_vec, reward, nq, done)
 
     def train_step(self) -> float | None:
         """
@@ -388,10 +452,21 @@ class QLearningAgent:
 
         states, actions, rewards, next_best_qs, dones = self.buffer.sample(BATCH_SIZE)
 
+        rewards = np.clip(
+            np.nan_to_num(rewards, nan=0.0, posinf=10.0, neginf=-10.0), -10.0, 10.0
+        )
+        next_best_qs = np.clip(
+            np.nan_to_num(next_best_qs, nan=0.0, posinf=TARGET_Q_CLIP, neginf=-TARGET_Q_CLIP),
+            -TARGET_Q_CLIP,
+            TARGET_Q_CLIP,
+        )
+
         # Bellman targets using the stored next-state best Q (from target_net).
         targets = (rewards + GAMMA * next_best_qs * (1.0 - dones)).reshape(-1, 1)
+        targets = np.clip(targets, -TARGET_Q_CLIP, TARGET_Q_CLIP)
 
         inputs = np.concatenate([states, actions], axis=1)
+        inputs = np.nan_to_num(inputs, nan=0.0, posinf=0.0, neginf=0.0)
         self.q_net.forward(inputs)
         self.q_net.backward(targets)
 
@@ -433,7 +508,9 @@ class QLearningAgent:
             )
             return False
         for k, v in data["params"].items():
-            setattr(self.q_net, k, v)
+            setattr(self.q_net, k, np.asarray(v, dtype=np.float32))
+        self.q_net._clip_params()
+        self.q_net.reset_optimizer_state()
         self.epsilon = data["epsilon"]
         self._steps = data["steps"]
         if isinstance(data.get("replay"), dict):

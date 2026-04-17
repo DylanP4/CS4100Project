@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import re
 
+from constants import MAX_CLUE_TARGETS
+
 
 class SchemaError(ValueError):
     pass
@@ -98,7 +100,10 @@ def parse_clue(
                 raise SchemaError(f'"intended" word {u!r} must be one of your team words on the board')
             seen.add(u)
             out.append(u)
-        intended = out if out else None
+        if out:
+            intended = out[:MAX_CLUE_TARGETS]
+        else:
+            intended = None
 
     return w, n, intended
 

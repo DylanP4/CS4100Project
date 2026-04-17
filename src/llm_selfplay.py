@@ -20,7 +20,7 @@ import os
 import random
 import time
 
-from constants import BLUE, PHASE_OPERATIVE, PHASE_SPYMASTER, RED
+from constants import BLUE, MAX_CLUE_TARGETS, PHASE_OPERATIVE, PHASE_SPYMASTER, RED
 from game_engine import GameEngine
 from ai.agent import AI_AGENT_SAVE_PATH, EMPTY_BOARD_VIEW, SpymasterAgent
 from ai.embeddings import load_model
@@ -30,15 +30,17 @@ from ai.llm_groq import groq_chat_messages, groq_complete, groq_configured, requ
 from ai.llm_providers import LLMProviderError
 from ai.llm_schemas import SchemaError, extract_json_object, parse_clue, parse_operative_turn
 
-SPYMASTER_SYSTEM = """Codenames spymaster. One-word clue not on the board (no substring-of-board-word tricks).
+SPYMASTER_SYSTEM = f"""Codenames spymaster. One-word clue not on the board (no substring-of-board-word tricks).
 Return ONE JSON object only — no markdown, no extra text, no explanations.
 Use ONLY these keys: clue, number, intended. Do NOT include any other keys.
-Schema: {"clue":"<word>","number":<int>=1,"intended":["W",...]?}
-We are maximizing strong single-word associations: use number=1 by default.
-Only use number=2 when the clue very clearly connects two team words.
-Never use number>=3.
+Schema: {{"clue":"<word>","number":<1..{MAX_CLUE_TARGETS}>,"intended":["W",...]?}}
+Targeting policy:
+- "number" is how many team words you intend (1, 2, or {MAX_CLUE_TARGETS} only). Aim for number=1 about 80–90% of the time.
+- Use number=2 only when you are confident the guesser will successfully guess both intended words.
+- Use number={MAX_CLUE_TARGETS} only when you are almost certain the guesser will get all {MAX_CLUE_TARGETS}.
+- At most {MAX_CLUE_TARGETS} words in "intended"; never list more than {MAX_CLUE_TARGETS} team words.
+If you include "intended", list exactly "number" words, each copied EXACTLY from the TEAM list in the user message.
 Clue must NOT match any board word (team/opp/neutral/assassin) and must be one word.
-If you include "intended", it MUST be copied EXACTLY from the TEAM list in the user message.
 Never invent, transform, or generalize intended words (e.g., DOCTOR, FIRE, RED, IRON, BEAR, LEMON, IVORY).
 If unsure, OMIT "intended" entirely.
 Use clear, everyday clues."""
@@ -153,22 +155,16 @@ def run_spymaster_turn(
             last_raw = raw
             obj = extract_json_object(raw)
             clue, number, intended_list = parse_clue(obj, board_set, team_set)
-            if number > 2:
-                if verbose:
-                    print(
-                        f"[llm_selfplay] spymaster number clamped {number} -> 2",
-                        file=sys.stderr,
-                    )
-                number = 2
-            if number == 2 and (not intended_list or len(intended_list) < 2):
-                # Strong bias toward single-target clues; allow 2 only when the model
-                # can explicitly name two team targets via "intended".
-                if verbose:
-                    print(
-                        "[llm_selfplay] spymaster number softened 2 -> 1 (no 2-word intended list)",
-                        file=sys.stderr,
-                    )
-                number = 1
+            number = min(MAX_CLUE_TARGETS, max(1, number))
+            if intended_list:
+                k = len(intended_list)
+                if k == 0:
+                    intended_list = None
+                else:
+                    # Match declared count to explicit targets; cap at MAX_CLUE_TARGETS.
+                    number = min(MAX_CLUE_TARGETS, max(number, k))
+                    if number > k:
+                        number = k
             break
         except (SchemaError, ValueError) as e:
             last_err = str(e)
@@ -454,6 +450,11 @@ def main() -> None:
     )
     p.add_argument("-v", "--verbose", action="store_true")
     p.add_argument("--seed", type=int, default=None)
+    p.add_argument(
+        "--reset-replay",
+        action="store_true",
+        help="After load: wipe replay buffer + reset Q-net Adam, save checkpoint, then play (keeps weights).",
+    )
     args = p.parse_args()
 
     if not groq_configured():
@@ -472,6 +473,10 @@ def main() -> None:
         print(f"[llm_selfplay] embeddings ready in {time.perf_counter() - t0:.1f}s")
 
     agent = SpymasterAgent(save_path=ckpt)
+    if args.reset_replay:
+        agent.reset_replay_checkpoint()
+        if args.verbose:
+            print("[llm_selfplay] replay wiped and checkpoint saved (--reset-replay)")
 
     completed = 0
     aborts = 0
