@@ -69,6 +69,13 @@ python -m src.main use-ai-agent
 ```
 Loads weights from `data/ai_agent.pkl`. During each Spymaster phase, click **AI Suggest** to get a clue recommendation. No training occurs.
 
+To load a different checkpoint (e.g. an experiment file), set `CODENAMES_AI_AGENT_PKL` before running:
+```bash
+# PowerShell
+$env:CODENAMES_AI_AGENT_PKL="data/ai_agent_experiment.pkl"
+python -m src.main use-ai-agent
+```
+
 ### Interactive training mode
 ```bash
 python -m src.main training
