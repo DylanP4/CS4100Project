@@ -159,3 +159,38 @@ error=guess must be exactly one unrevealed board word; got 'METAL'
 raw=
 {"guess":"METAL","for_clue":"1"}
 ----------------------------------------
+[2026-04-17 10:36:06] role=operative
+error="for_clue" round index must be 1..0, got 1
+raw=
+{"guess":"BERRY","for_clue":"1"}
+----------------------------------------
+[2026-04-17 10:39:04] role=spymaster
+error="intended" word 'ARTIST' must be one of your team words on the board
+raw=
+{"clue":"painter","number":1,"intended":["ARTIST"]}
+----------------------------------------
+[2026-04-17 10:42:45] role=spymaster
+error="intended" word 'FIRE' must be one of your team words on the board
+raw=
+{"clue":"flame","number":1,"intended":["FIRE"]}
+----------------------------------------
+[2026-04-17 10:45:25] role=spymaster
+error="intended" word 'CHURCH' must be one of your team words on the board
+raw=
+{"clue":"altar","number":1,"intended":["CHURCH"]}
+----------------------------------------
+[2026-04-17 10:46:02] role=operative
+error="for_clue" round index must be 1..0, got 1
+raw=
+{"guess":"LASER","for_clue":"1"}
+----------------------------------------
+[2026-04-17 10:47:30] role=operative
+error="for_clue" round index must be 1..0, got 1
+raw=
+{"guess":"PHOENIX","for_clue":"1"}
+----------------------------------------
+[2026-04-17 10:48:01] role=operative
+error="for_clue" round index must be 1..0, got 1
+raw=
+{"guess":"PHOENIX","for_clue":"1"}
+----------------------------------------
