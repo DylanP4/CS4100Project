@@ -1,5 +1,7 @@
 """Groq-only convenience API (Gemini remains in llm_providers for optional use)."""
 
+from __future__ import annotations
+
 from ai.llm_config import GROQ_API_KEY, GROQ_MODEL
 from ai.llm_providers import LLMProviderError, chat_completion
 

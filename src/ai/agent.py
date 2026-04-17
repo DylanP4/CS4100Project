@@ -10,6 +10,8 @@ After the human operative finishes guessing:
     agent.record_outcome(outcomes, next_view, done)
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 import os
 from pathlib import Path

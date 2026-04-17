@@ -194,3 +194,126 @@ error="for_clue" round index must be 1..0, got 1
 raw=
 {"guess":"PHOENIX","for_clue":"1"}
 ----------------------------------------
+[2026-04-17 12:26:16] role=operative
+error=guess must be exactly one unrevealed board word; got 'JUDGE'
+raw=
+{"guess":"JUDGE","for_clue":"none"}
+----------------------------------------
+[2026-04-17 12:27:00] role=operative
+error=guess must be exactly one unrevealed board word; got 'FAN'
+raw=
+{"guess":"FAN","for_clue":"current"}
+----------------------------------------
+[2026-04-17 12:27:35] role=operative
+error=guess must be exactly one unrevealed board word; got 'FAN'
+raw=
+{"guess":"FAN","for_clue":"current"}
+----------------------------------------
+[2026-04-17 12:28:30] role=operative
+error=guess must be exactly one unrevealed board word; got 'FAN'
+raw=
+{"guess":"FAN","for_clue":"current"}
+----------------------------------------
+[2026-04-17 12:29:06] role=operative
+error=guess must be exactly one unrevealed board word; got 'FAN'
+raw=
+{"guess":"FAN","for_clue":"current"}
+----------------------------------------
+[2026-04-17 12:31:51] role=operative
+error=guess must be exactly one unrevealed board word; got 'CYCLE'
+raw=
+{"guess":"CYCLE","for_clue":"none"}
+----------------------------------------
+[2026-04-17 12:33:23] role=operative
+error=guess must be exactly one unrevealed board word; got 'SHIP'
+raw=
+{"guess":"SHIP","for_clue":"current"}
+----------------------------------------
+[2026-04-17 12:34:16] role=operative
+error="for_clue" round index must be 1..0, got 1
+raw=
+{"guess":"PIANO","for_clue":"1"}
+----------------------------------------
+[2026-04-17 12:34:42] role=operative
+error="for_clue" round index must be 1..0, got 1
+raw=
+{"guess":"BOND","for_clue":"1"}
+----------------------------------------
+[2026-04-17 12:48:44] role=spymaster
+error="intended" word 'FIRE' must be one of your team words on the board
+raw=
+{"clue":"flame","number":1,"intended":["FIRE"]}
+----------------------------------------
+[2026-04-17 12:59:36] role=operative
+error=guess must be exactly one unrevealed board word; got 'CROWN'
+raw=
+{
+  "guess": "CROWN",
+  "for_clue": "none"
+}
+----------------------------------------
+[2026-04-17 13:02:29] role=operative
+error=guess must be exactly one unrevealed board word; got 'CLOUD'
+raw=
+{"guess":"CLOUD","for_clue":"none"}
+----------------------------------------
+[2026-04-17 13:15:53] role=spymaster
+error=clue cannot match any word on the board
+raw=
+{"clue":"Fire","number":1,"intended":["EMBASSY"]}
+----------------------------------------
+[2026-04-17 13:19:51] role=spymaster
+error="intended" word 'ARTIST' must be one of your team words on the board
+raw=
+{"clue":"painter","number":1,"intended":["ARTIST"]}
+----------------------------------------
+[2026-04-17 13:24:53] role=operative
+error=guess must be exactly one unrevealed board word; got 'OCEAN'
+raw=
+{"guess":"OCEAN","for_clue":"current"}
+----------------------------------------
+[2026-04-17 13:27:57] role=operative
+error=guess must be exactly one unrevealed board word; got 'NET'
+raw=
+{"guess":"NET","for_clue":"none"}
+----------------------------------------
+[2026-04-17 13:29:08] role=spymaster
+error=no JSON object found in model output
+raw=
+{"clue":"Ocean","number":1,"intended":["W","E","N","S","N","E","W","N","E","W","E","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E","W","N","S","N","E","W","N","E
+----------------------------------------
+[2026-04-17 13:30:21] role=operative
+error=guess must be exactly one unrevealed board word; got 'SPACE'
+raw=
+{"guess":"SPACE","for_clue":"current"}
+----------------------------------------
+[2026-04-17 13:32:27] role=operative
+error=guess must be exactly one unrevealed board word; got 'CARROT'
+raw=
+{"guess":"CARROT","for_clue":"none"}
+----------------------------------------
+[2026-04-17 13:37:10] role=spymaster
+error="intended" word 'W' must be one of your team words on the board
+raw=
+{"clue":"Ocean","number":1,"intended":["W","E","N","S","T","F","B","A"]}
+----------------------------------------
+[2026-04-17 13:40:24] role=spymaster
+error="intended" word 'BLUE' must be one of your team words on the board
+raw=
+{"clue":"cloud","number":1,"intended":["BLUE"]}
+----------------------------------------
+[2026-04-17 13:42:45] role=operative
+error=guess must be exactly one unrevealed board word; got 'CLOUD'
+raw=
+{"guess":"CLOUD","for_clue":1}
+----------------------------------------
+[2026-04-17 13:44:00] role=spymaster
+error="intended" word 'RED' must be one of your team words on the board
+raw=
+{"clue":"fire","number":1,"intended":["RED"]}
+----------------------------------------
+[2026-04-17 13:47:19] role=operative
+error=guess must be exactly one unrevealed board word; got 'DOM'
+raw=
+{"guess":"DOM","for_clue":"1"}
+----------------------------------------

@@ -8,6 +8,8 @@ Loads a pre-trained gensim model (default: GloVe 100d) and exposes:
 The model is downloaded once (~130 MB) to ~/gensim-data and cached locally.
 """
 
+from __future__ import annotations
+
 from collections import defaultdict
 
 import numpy as np

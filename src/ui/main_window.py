@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from PyQt6.QtCore import QThread, pyqtSignal
 from PyQt6.QtWidgets import QMainWindow, QMessageBox, QVBoxLayout, QWidget
 

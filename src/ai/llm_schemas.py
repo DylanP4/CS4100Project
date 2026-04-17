@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import re
 
@@ -108,6 +110,9 @@ def _normalize_for_clue(raw, past_clue_round_count: int) -> str:
         return "current"
     if isinstance(raw, (int, float)):
         k = int(raw)
+        # Models often emit 1 for "first clue of the game" when N=0 past rounds; map to current.
+        if past_clue_round_count == 0 and k == 1:
+            return "current"
         if k < 1 or k > past_clue_round_count:
             raise SchemaError(
                 f'"for_clue" round index must be 1..{past_clue_round_count} '
@@ -121,6 +126,8 @@ def _normalize_for_clue(raw, past_clue_round_count: int) -> str:
         return "none" if s == "none" else "arbitrary"
     if s.isdigit():
         k = int(s)
+        if past_clue_round_count == 0 and k == 1:
+            return "current"
         if k < 1 or k > past_clue_round_count:
             raise SchemaError(
                 f'"for_clue" round index must be 1..{past_clue_round_count}, got {k}'

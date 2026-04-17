@@ -118,7 +118,20 @@ def _groq_chat(
     last_body = ""
     with httpx.Client(timeout=timeout_s) as client:
         for attempt in range(max_attempts):
-            r = client.post(url, json=payload, headers=headers)
+            try:
+                r = client.post(url, json=payload, headers=headers)
+            except httpx.RequestError as e:
+                # Transient TLS / TCP issues (e.g. "Connection reset by peer") should not abort training.
+                if attempt + 1 >= max_attempts:
+                    raise LLMProviderError(f"Groq network error after {max_attempts} attempts: {e}") from e
+                sleep_s = min(60.0, 1.5**attempt)
+                time.sleep(sleep_s)
+                if interval > 0:
+                    gap = interval - (time.perf_counter() - _groq_last_request_end_s)
+                    if gap > 0:
+                        time.sleep(gap)
+                continue
+
             _groq_last_request_end_s = time.perf_counter()
             last_body = r.text[:2000]
 
