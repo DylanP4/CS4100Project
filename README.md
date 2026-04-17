@@ -162,6 +162,12 @@ The Bellman target is computed and one gradient step is taken via MSE loss. Epsi
 
 ---
 
+## Use of Generative AI
+
+Generative AI was used throughout this project as a development tool. This included writing and iterating on large portions of the codebase — the Q-learning agent, embedding pipeline, LLM self-play loop, PyQt6 UI, and JSON schema validation for Groq responses. AI was also used to explain concepts (word embeddings, Q-networks, the Bellman equation), debug issues, and help reason through design decisions like reward shaping and state representation.
+
+---
+
 ## License
 
 Educational and personal use only. Codenames is a trademark of Czech Games Edition.
