@@ -1,0 +1,32 @@
+error,count
+"""for_clue"" round index must be 1..0, got 1",26
+"""intended"" word 'BLUE' must be one of your team words on the board",4
+"""for_clue"": ""current"" | <past round 1..N> | ""none"" | ""arbitrary""",3
+guess must be exactly one unrevealed board word; got 'CAR',3
+"""intended"" word 'FIRE' must be one of your team words on the board",2
+guess must be exactly one unrevealed board word; got 'SHIP',2
+guess must be exactly one unrevealed board word; got 'BLOCK',2
+guess must be exactly one unrevealed board word; got 'PLANE',2
+"""intended"" word 'DOCTOR' must be one of your team words on the board",1
+"""intended"" word 'RED' must be one of your team words on the board",1
+guess must be exactly one unrevealed board word; got 'DROP',1
+"""intended"" word 'BEAR' must be one of your team words on the board",1
+"""intended"" word 'IRON' must be one of your team words on the board",1
+guess must be exactly one unrevealed board word; got 'SMUGGLER',1
+"""intended"" word 'LEMON' must be one of your team words on the board",1
+clue cannot match any word on the board,1
+guess must be exactly one unrevealed board word; got 'LIMOUSINE',1
+guess must be exactly one unrevealed board word; got 'GAME',1
+"""intended"" word 'LEAD' must be one of your team words on the board",1
+"""intended"" word 'IVORY' must be one of your team words on the board",1
+guess must be exactly one unrevealed board word; got 'ROCK',1
+guess must be exactly one unrevealed board word; got 'GUN',1
+guess must be exactly one unrevealed board word; got 'TELEPHONE',1
+guess must be exactly one unrevealed board word; got 'DOCTOR',1
+guess must be exactly one unrevealed board word; got 'WIND',1
+guess must be exactly one unrevealed board word; got 'PIE',1
+guess must be exactly one unrevealed board word; got 'MAIL',1
+guess must be exactly one unrevealed board word; got 'COMPUTER',1
+guess must be exactly one unrevealed board word; got 'BULLET',1
+guess must be exactly one unrevealed board word; got 'ENGINEER',1
+"""intended"" word 'ARTIST' must be one of your team words on the board",1

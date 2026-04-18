@@ -1,0 +1,69 @@
+{
+  "checkpoint": "data\\ai_agent.pkl",
+  "steps": 737,
+  "epsilon": 0.1,
+  "replay_transitions": 768,
+  "reward_mean": -0.033906251192092896,
+  "reward_std": 1.1156978607177734,
+  "reward_buckets": {
+    "opponent": 241,
+    "positive": 186,
+    "neutral_or_zero": 297,
+    "assassin": 44
+  },
+  "terminal_rate": 0.0963541641831398,
+  "failure_log": "data\\llm_failures.log",
+  "failures_total": 67,
+  "failures_by_role": {
+    "spymaster": 15,
+    "operative": 52
+  },
+  "failures_by_day": {
+    "2026-04-10": 12,
+    "2026-04-11": 39,
+    "2026-04-12": 9,
+    "2026-04-17": 7
+  },
+  "top_failure_reasons": [
+    [
+      "\"for_clue\" round index must be 1..0, got 1",
+      26
+    ],
+    [
+      "\"intended\" word 'BLUE' must be one of your team words on the board",
+      4
+    ],
+    [
+      "\"for_clue\": \"current\" | <past round 1..N> | \"none\" | \"arbitrary\"",
+      3
+    ],
+    [
+      "guess must be exactly one unrevealed board word; got 'CAR'",
+      3
+    ],
+    [
+      "\"intended\" word 'FIRE' must be one of your team words on the board",
+      2
+    ],
+    [
+      "guess must be exactly one unrevealed board word; got 'SHIP'",
+      2
+    ],
+    [
+      "guess must be exactly one unrevealed board word; got 'BLOCK'",
+      2
+    ],
+    [
+      "guess must be exactly one unrevealed board word; got 'PLANE'",
+      2
+    ],
+    [
+      "\"intended\" word 'DOCTOR' must be one of your team words on the board",
+      1
+    ],
+    [
+      "\"intended\" word 'RED' must be one of your team words on the board",
+      1
+    ]
+  ]
+}

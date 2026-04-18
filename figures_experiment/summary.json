@@ -1,0 +1,67 @@
+{
+  "checkpoint": "data\\ai_agent_experiment.pkl",
+  "steps": 1255,
+  "epsilon": 0.1,
+  "replay_transitions": 1286,
+  "reward_mean": 0.007962670177221298,
+  "reward_std": 1.1417096853256226,
+  "reward_buckets": {
+    "opponent": 394,
+    "positive": 335,
+    "neutral_or_zero": 483,
+    "assassin": 74
+  },
+  "terminal_rate": 0.09486781060695648,
+  "failure_log": "data\\llm_failures_experiment.log",
+  "failures_total": 56,
+  "failures_by_role": {
+    "operative": 41,
+    "spymaster": 15
+  },
+  "failures_by_day": {
+    "2026-04-16": 24,
+    "2026-04-17": 32
+  },
+  "top_failure_reasons": [
+    [
+      "\"for_clue\" round index must be 1..0, got 1",
+      26
+    ],
+    [
+      "\"intended\" word 'ARTIST' must be one of your team words on the board",
+      3
+    ],
+    [
+      "\"intended\" word 'FIRE' must be one of your team words on the board",
+      3
+    ],
+    [
+      "guess must be exactly one unrevealed board word; got 'CAR'",
+      2
+    ],
+    [
+      "\"intended\" word 'BLUE' must be one of your team words on the board",
+      2
+    ],
+    [
+      "guess must be exactly one unrevealed board word; got 'MAPLE'",
+      2
+    ],
+    [
+      "\"intended\" word 'WATER' must be one of your team words on the board",
+      2
+    ],
+    [
+      "guess must be exactly one unrevealed board word; got 'PILOT'",
+      2
+    ],
+    [
+      "guess must be exactly one unrevealed board word; got 'PIRATE'",
+      2
+    ],
+    [
+      "you must guess at least once before passing",
+      1
+    ]
+  ]
+}

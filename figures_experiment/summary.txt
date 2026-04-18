@@ -1,0 +1,8 @@
+checkpoint: data\ai_agent_experiment.pkl
+steps: 1255
+epsilon: 0.1000
+replay transitions: 1286
+reward mean/std: 0.007962670177221298 / 1.1417096853256226
+terminal rate: 0.09486781060695648
+failure log: data\llm_failures_experiment.log
+failures total: 56

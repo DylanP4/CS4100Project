@@ -1,0 +1,8 @@
+checkpoint: data\agent.pkl
+steps: 0
+epsilon: 0.6211
+replay transitions: 0
+reward mean/std: None / None
+terminal rate: None
+failure log: data\llm_failures.log
+failures total: 67
